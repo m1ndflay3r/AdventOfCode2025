@@ -1,0 +1,46 @@
+#!/usr/bin/env zsh
+
+## env setup
+
+# Fetch puzzle input, error if 'input' not exist
+dayone_input=$(<input) || {
+  print "Error: could not find puzzle input"
+  return 1
+}
+
+# Initialize zeros counter
+zeros=0
+
+# Initialize dial pointer
+current_pos=50
+
+## main
+
+# Iterate over input, using newline for field separation
+IFS=$'\n'
+for input_line in $=dayone_input; do
+  # Separate rotation direction from number of steps
+  direction=${input_line: :1}
+  steps=${input_line:1}
+
+  # Apply rotation
+  [ "$direction" = 'R' ] && {
+    (( current_pos += steps ))
+  } || {
+    (( current_pos -= steps ))
+  }
+
+  # Normalize position within 0-99 using modulo.
+  # Add 100, modulo again to ensure index is positive
+  (( current_pos = (current_pos % 100 + 100) % 100 ))
+
+  # Check if is pos. 0
+  (( current_pos == 0 )) && {
+    (( zeros++ ))
+  }
+
+done
+unset IFS
+
+# Print total zeros
+print $zeros
