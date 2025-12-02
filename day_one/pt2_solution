@@ -1,0 +1,60 @@
+#!/usr/bin/env zsh
+
+## env setup
+
+# fetch puzzle input, error if 'input' not exist
+dayone_input=$(<input) || {
+  print "Error: could not find puzzle input"
+  return 1
+}
+
+# initialize zero count
+zeros=0
+# initialize pointer
+current_pos=50
+
+## main
+IFS=$'\n'
+for input_line in $=dayone_input; do
+
+  direction=${input_line: :1}
+  steps=${input_line:1}
+
+  [ "$direction" = "R" ] && {
+    # calculate zeros (100s)
+    # floor result with integer div
+    (( zeros += (current_pos + steps) / 100 ))
+
+    # update position
+    (( current_pos += steps ))
+
+  } || {
+    # if current pos is 0, distance to next 0 is 100
+    (( current_pos == 0 )) && {
+        dist_to_zero=100
+    } || {
+        dist_to_zero=$current_pos
+    }
+
+    # check if enough steps for first zero
+    (( steps >= dist_to_zero )) && {
+        (( zeros++ )) # We hit the first zero
+
+        # calculate remaining steps after 1st zero
+        (( remaining = steps - dist_to_zero ))
+
+        # increase zeros by 1 for every 100 steps remaining
+        (( zeros += remaining / 100 ))
+    }
+
+    # update position
+    (( current_pos -= steps ))
+  }
+
+  # normalize position to 0-99 (double modulo)
+  (( current_pos = (current_pos % 100 + 100) % 100 ))
+
+done
+unset IFS
+
+print "$zeros"
