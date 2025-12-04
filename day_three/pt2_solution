@@ -1,0 +1,105 @@
+#!/usr/bin/env zsh
+
+## env setup
+# include zsh_libmisc, load needed library functions
+fpath=(/usr/lib/zsh_libmisc/libmisc.zwc $fpath)
+autoload query_jobs
+autoload revstr
+
+# read puzzle input into variable
+daythree_input=$(< input) || {
+  print "Error: could not find puzzle input"
+  return 1
+}
+
+# delete working dir if exist, and remake (sanitation)
+[ -d /tmp/daythree_working ] && {
+  rm -rf /tmp/daythree_working
+}
+mkdir /tmp/daythree_working
+
+# set job count to total cpu threads + 1 if not already defined
+[ -z "$j" ] && {
+  j=$(($(nproc)+1))
+}
+
+# initialize worker id var
+worker_id=0
+
+# initialize worker ids arr
+declare -a worker_ids
+
+# initialize result var
+result='0'
+
+## helper functions
+create_worker() {
+  # initialize 12 indice array with -1
+  declare -a best_jolts
+  for k in {1..12}; do best_jolts[$k]=-1; done
+  # reverse string for right -> left reading
+  working_nums=$(revstr "$sort_me")
+  # begin parse
+  while [[ -n "$working_nums" ]]; do
+    # pop one digit
+    working_num=${working_nums: :1}
+    working_nums=${working_nums:1}
+    # update best_jolts[12] through best_jolts[2]
+    for (( k=12; k>=2; k-- )); do
+      prev_len=$((k-1))
+      best_prev=${best_jolts[$prev_len]}
+      # if is valid sequence
+      (( best_prev != -1 )) && {
+        # working_num * 10^(k-1) + previous_best
+        multiplier=$(( 10 ** prev_len ))
+        new_val=$(( working_num * multiplier + best_prev ))
+        (( new_val > best_jolts[$k] )) && {
+          best_jolts[$k]=$new_val
+        }
+      }
+    done
+    # update best_jolts
+    (( working_num > best_jolts[1] )) && {
+      best_jolts[1]=$working_num
+    }
+  done
+  # output results
+  print "${best_jolts[12]}" > /tmp/daythree_working/"$worker_id"
+  touch /tmp/daythree_working/"$worker_id".comp
+}
+
+
+## main
+# start workers
+IFS=$'\n'
+for sort_me in $=daythree_input; do
+  # check active job count, wait if is greater than or equal to $j
+  [ "$(query_jobs)" -ge "$j" ] && {
+    until [ "$(query_jobs)" -lt "$j" ]; do
+      sleep 1
+    done
+  }
+  sort_me="$sort_me" worker_id="$worker_id" create_worker &
+  worker_ids+=("$worker_id")
+  worker_id=$((worker_id+1))
+done
+unset IFS
+
+# wait for all workers to finish
+for chk_worker in $worker_ids[@]; do
+  until [ -f /tmp/daythree_working/"$chk_worker".comp ]; do
+    sleep 1
+  done
+done
+
+# tally up worker results
+for worker_res in $worker_ids[@]; do
+  do_tally=$(< /tmp/daythree_working/"$worker_res")
+  result=$((result+do_tally))
+done
+
+# print result
+print $result
+
+#cleanup
+rm -rf /tmp/daythree_working
