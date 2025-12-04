@@ -1,0 +1,122 @@
+#!/usr/bin/env zsh
+
+## env setup
+# include zsh_libmisc, load needed library functions
+fpath=(/usr/lib/zsh_libmisc/libmisc.zwc $fpath)
+autoload 2d_arr
+autoload fox-fr
+autoload query_jobs
+
+# read puzzle input into 2d array, error if file 'input' not found
+fox-fr input | 2d_arr cr dayfour_input || {
+  print "Error: \'input\' not found"
+  return 1
+}
+
+# initialize worker_id var
+worker_id=0
+
+# initialize worker_ids arr
+declare -a worker_ids
+
+# remove working dir if exist, and remake
+[ -d /tmp/dayfour_working ] && {
+  rm -rf /tmp/dayfour_working
+}
+mkdir /tmp/dayfour_working
+
+# initialize x pointer
+ex_pointer=0
+
+# initialize y pointer
+why_pointer=0
+
+# initialize result var
+result=0
+
+# fetch x length
+ex_length=$(2d_arr qg dayfour_input -x)
+
+# fetch y length
+why_length=$(2d_arr qg dayfour_input -y)
+
+# set default thread count if j is undefined
+[ -z "$j" ] && {
+  j=$((nproc+1))
+}
+
+## helper functions
+query_hitbox() {
+  qh_directions=('n'
+                 'ne'
+                 'e'
+                 'se'
+                 's'
+                 'sw'
+                 'w'
+                 'nw'
+                )
+  for qh_dir in $=qh_directions; do
+    single=1 2d_arr qa dayfour_input $ex $why $qh_dir
+  done
+}
+alias qh=query_hitbox
+
+tally_adj() {
+  tallied=0
+  # fetch adjacent chars
+  to_tally=$(ex=$ex why=$why qh)
+  IFS=$'\n'
+  for tally_ho in $=to_tally; do
+    [[ "$tally_ho" = *'@'* ]] && {
+      tallied=$((tallied+1))
+    }
+  done
+  unset IFS
+  return $tallied
+}
+
+create_worker() {
+  ex=$ex why=$why tally_adj
+  ta_res=$?
+  ((ta_res<4)) && {
+    print '1' > /tmp/dayfour_working/$worker_id
+  } || {
+    print '0' > /tmp/dayfour_working/$worker_id
+  }
+}
+
+## main
+while true; do
+  ((ex_pointer+=1))
+  ((ex_pointer>ex_length)) && {
+    ((why_pointer+=1))
+    ex_pointer=1
+  }
+  ((why_pointer>why_length)) && {
+    break
+  }
+  ((worker_id+=1))
+  worker_ids+=("$worker_id")
+  [ "$(query_jobs)" -ge "$j" ] && {
+    until [ "$(query_jobs)" -lt "$j" ]; do
+      sleep 1
+    done
+  }
+  ex=$ex_pointer why=$why_pointer create_worker &
+done
+
+for chk_id in $worker_ids[@]; do
+  until [ -f /tmp/dayfour_working/$chk_id ]; do
+    sleep 1
+  done
+done
+
+for final_tally in $worker_ids[@]; do
+  le_tallie=$(< /tmp/dayfour_working/$final_tally)
+  [ $le_tallie = 1 ] && {
+    ((result+=1))
+  }
+done
+
+print $result
