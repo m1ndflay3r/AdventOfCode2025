@@ -172,10 +172,10 @@ done
 # tally up result
 for final_tally in $worker_ids[@]; do
   le_tallie=$(< /tmp/dayfour_working/$final_tally)
-  [ $le_tallie = != 0 ] && {
+  [[ "$le_tallie" != "0" ]] && {
     ((result+=1))
+    dayfour_input[$le_tallie]="."
   }
-  dayfour_input[$le_tallie]="."
 done
 
 ((result+=oldresult))
@@ -210,3 +210,4 @@ done
   rm -rf /tmp/dayfour_working
   ./pt2_solution
 }
+
