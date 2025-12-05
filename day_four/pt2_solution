@@ -57,7 +57,6 @@ declare -a worker_ids
   rm -rf /tmp/dayfour_working
 }
 mkdir /tmp/dayfour_working
-touch /tmp/dayfour_working/toremove
 
 # initialize x pointer
 ex_pointer=0
@@ -125,8 +124,7 @@ create_worker() {
     ta_res=$?
     # if tally smaller than 4, print 1 to worker result
     ((ta_res<4)) && {
-      print ""$ex","$why"" >> /tmp/dayfour_working/toremove
-      print '1' > /tmp/dayfour_working/$worker_id
+      print ""$ex","$why"" > /tmp/dayfour_working/$worker_id
     # else print 0 to worker results
     } || {
       print '0' > /tmp/dayfour_working/$worker_id
@@ -174,19 +172,13 @@ done
 # tally up result
 for final_tally in $worker_ids[@]; do
   le_tallie=$(< /tmp/dayfour_working/$final_tally)
-  [ $le_tallie = 1 ] && {
+  [ $le_tallie = != 0 ] && {
     ((result+=1))
   }
+  dayfour_input[$le_tallie]="."
 done
 
 ((result+=oldresult))
-
-toremove=$(< /tmp/dayfour_working/toremove)
-IFS=$'\n'
-for do_remove in $=toremove; do
-  dayfour_working[$do_remove]='.'
-done
-unset IFS
 
 # print result
 [ "$result" = "$oldresult" ] && {
