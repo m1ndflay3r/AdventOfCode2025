@@ -1,0 +1,122 @@
+#!/usr/bin/env zsh
+
+## env setup
+# read puzzle input into variable, error if not found
+dayfive_input=$(<input) || {
+  print "Error: cannot find \'input\'"
+  return 1
+}
+
+# include zsh_libmisc, load needed library functions
+fpath=(/usr/lib/zsh_libmisc/libmisc.zwc $fpath)
+autoload query_jobs
+
+# include zselect
+zmodload zsh/zselect
+
+# init + populate ingredients + ingredient range arrays
+declare -a ingredients
+declare -a ingredient_range
+divide=0
+IFS=$'\n'
+for le_line in $=dayfive_input; do
+  [ "$le_line" != DIVIDE ] && {
+    ((divide==0)) && {
+      ingredient_range+=("$le_line")
+    } || {
+      ingredients+=("$le_line")
+    }
+  }
+  [ "$le_line" = DIVIDE ] && {
+    divide=1
+  }
+done
+unset IFS
+
+# remove working dir if exist, and recreate (sanitation)
+[ -d /tmp/dayfive_working ] && {
+  rm -rf /tmp/dayfive_working
+}
+mkdir /tmp/dayfive_working
+
+# initialize worker id var
+worker_id=0
+
+# initialize worker ids array
+declare -a worker_ids
+
+# initialize result var
+result=0
+
+# set job count to cpu threads+1 if j not user defined
+[ -z "$j" ] && {
+  j=$(($(nproc)+1))
+}
+
+## helper functions
+create_worker() {
+  fresh_flag=0
+  # begin iterating over every range in ingredient_range array
+  for chk_range in $ingredient_range[@]; do
+    # easy debug way to kill all workers
+    [ -f /tmp/dayfive_working/killworkers ] && {
+      break
+    }
+    # separate range start and fin into their own variables
+    range_start=''
+    range_fin=''
+    IFS=$'-'
+    for crnge in $=chk_range; do
+      [ -z "$range_start" ] && {
+        range_start="$crnge"
+      } || {
+        range_fin="$crnge"
+      }
+    done
+    unset IFS
+    # check if ingredient >= range_start and <= range_fin, flag and break loop if so
+    ((range_start<=ingredient)) && ((range_fin>=ingredient)) && {
+      fresh_flag=1
+      break
+    }
+  done
+  [ "$fresh_flag" = 1 ] && {
+    print "$ingredient" > /tmp/dayfive_working/$worker_id
+  } || {
+    print "0" > /tmp/dayfive_working/$worker_id
+  }
+}
+
+## main
+# start worker for each ingredient
+for ingredient in $ingredients[@]; do
+  [ "$(query_jobs)" -ge "$j" ] && {
+    until [ "$(query_jobs)" -lt "$j" ]; do
+      zselect -t 5
+    done
+  }
+  ((worker_id++))
+  worker_ids+=("$worker_id")
+  worker_id="$worker_id" ingredient="$ingredient" create_worker &
+done
+
+# wait for workers to finish
+for chk_id_comp in $worker_ids[@]; do
+  until [ -f /tmp/dayfive_working/$chk_id_comp ]; do
+    zselect -t 5
+  done
+done
+
+# tally results
+for le_tallie in $worker_ids[@]; do
+  worker_out=$(</tmp/dayfive_working/$worker_id)
+  [ "$worker_out" != 0 ] && {
+    ((result++))
+  }
+done
+
+# print results
+print $result
+
+# cleanup
+#rm -rf /tmp/dayfive_working
