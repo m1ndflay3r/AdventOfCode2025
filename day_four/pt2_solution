@@ -5,12 +5,22 @@
 # include zsh_libmisc, load needed library functions
 fpath=(/usr/lib/zsh_libmisc/libmisc.zwc $fpath)
 autoload query_jobs
+zmodload zsh/zselect
 
 # read puzzle input into 2d array, error if file 'input' not found
 [ -f input ] || {
   print "Error: \'input\' not found"
   return 1
 }
+
+# read old result into variable if found, otherwise initialize as 0
+[ -f oldresult ] && {
+  oldresult=$(< oldresult)
+} || {
+  oldresult=0
+  cp input input.bak
+}
+
 unset dayfour_input
 declare -A dayfour_input
 input_raw=$(< input)
@@ -114,6 +124,7 @@ create_worker() {
     ta_res=$?
     # if tally smaller than 4, print 1 to worker result
     ((ta_res<4)) && {
+      dayfour_input[$ex,$why]='.'
       print '1' > /tmp/dayfour_working/$worker_id
     # else print 0 to worker results
     } || {
@@ -145,7 +156,7 @@ while true; do
   # if active jobs >= j, wait until < j
   [ "$(query_jobs)" -ge "$j" ] && {
     until [ "$(query_jobs)" -lt "$j" ]; do
-      sleep 1
+      zselect -t 5
     done
   }
   # start worker for current x y pointers
@@ -155,7 +166,7 @@ done
 # wait for workers to finish
 for chk_id in $worker_ids[@]; do
   until [ -f /tmp/dayfour_working/$chk_id ]; do
-    sleep 1
+    zselect -t 5
   done
 done
 
@@ -167,8 +178,35 @@ for final_tally in $worker_ids[@]; do
   }
 done
 
+((result+=old_result))
+
 # print result
-print $result
+[ "$result" = "$old_result" ] && {
+  print $result
+  rm oldresult
+  rm input
+  mv input.bak input
+} || {
+  print $result > oldresult
+  print -n '' > input
+  ex_cp_count=0
+  why_cp_count=0
+  while true; do
+    ((why_cp_count+=1))
+    ((why_cp_count>why_length)) && {
+      break
+    }
+    while true; do
+      ((ex_cp_count+=1))
+      ((ex_cp_count>ex_length)) && {
+        ex_cp_count=0
+        print >> input
+        break
+      }
+      print -n $dayfour_input[$ex_cp_count,$why_cp_count] >> input
+    done
+  done
+}
 
 #cleanup
 rm -rf /tmp/dayfour_working
