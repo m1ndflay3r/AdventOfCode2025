@@ -1,6 +1,7 @@
 #!/usr/bin/env zsh
 
 ## env setup
+
 # include zsh_libmisc, load needed library functions
 fpath=(/usr/lib/zsh_libmisc/libmisc.zwc $fpath)
 autoload 2d_arr
@@ -46,7 +47,10 @@ why_length=$(2d_arr qg dayfour_input -y)
 }
 
 ## helper functions
+
+# query one indice in every direction from current pos.
 query_hitbox() {
+  # defines array qh_directions as containing all compass directions
   qh_directions=('n'
                  'ne'
                  'e'
@@ -56,6 +60,7 @@ query_hitbox() {
                  'w'
                  'nw'
                 )
+  # query one indice in every direction, print contents
   for qh_dir in $=qh_directions; do
     single=1 2d_arr qa dayfour_input $ex $why $qh_dir
   done
@@ -63,29 +68,38 @@ query_hitbox() {
 alias qh=query_hitbox
 
 tally_adj() {
+  # initialize adj @ var
   tallied=0
-  # fetch adjacent chars
+  # fetch adjacent chars via query_hitbox
   to_tally=$(ex=$ex why=$why qh)
+  # set ifs to newline and iterate over each
   IFS=$'\n'
   for tally_ho in $=to_tally; do
+    # if line contains @, add it to adjacent @ tally
     [[ "$tally_ho" = *'@'* ]] && {
       tallied=$((tallied+1))
     }
   done
   unset IFS
+  # since this is small int (< 8), we can use return for result
   return $tallied
 }
 
 create_worker() {
+  # ensure current indice is @
   indice_contains=$(2d_arr query dayfour_input $ex $why)
   [[ "$indice_contains" = *'@'* ]] && {
+    # fetch total @ from tally_adj
     ex=$ex why=$why tally_adj
     ta_res=$?
+    # if tally smaller than 4, print 1 to worker result
     ((ta_res<4)) && {
       print '1' > /tmp/dayfour_working/$worker_id
+    # else print 0 to worker results
     } || {
       print '0' > /tmp/dayfour_working/$worker_id
     }
+  # if indice not @, skip above and print 0 to worker result
   } || {
     print '0' > /tmp/dayfour_working/$worker_id
   }
@@ -93,30 +107,39 @@ create_worker() {
 
 ## main
 while true; do
+  # increase x pointer
   ((ex_pointer+=1))
+  # if x pointer exceeds x length
   ((ex_pointer>ex_length)) && {
+    # set x pointer to 1, and increase y counter by 1
     ((why_pointer+=1))
     ex_pointer=1
   }
+  # if y pointer exceeds y length, break loop
   ((why_pointer>why_length)) && {
     break
   }
+  # increase worker id num, add new id to id arr
   ((worker_id+=1))
   worker_ids+=("$worker_id")
+  # if active jobs >= j, wait until < j
   [ "$(query_jobs)" -ge "$j" ] && {
     until [ "$(query_jobs)" -lt "$j" ]; do
       sleep 1
     done
   }
+  # start worker for current x y pointers
   ex=$ex_pointer why=$why_pointer create_worker &
 done
 
+# wait for workers to finish
 for chk_id in $worker_ids[@]; do
   until [ -f /tmp/dayfour_working/$chk_id ]; do
     sleep 1
   done
 done
 
+# tally up result
 for final_tally in $worker_ids[@]; do
   le_tallie=$(< /tmp/dayfour_working/$final_tally)
   [ $le_tallie = 1 ] && {
@@ -124,7 +147,7 @@ for final_tally in $worker_ids[@]; do
   }
 done
 
-# print results
+# print result
 print $result
 
 #cleanup
