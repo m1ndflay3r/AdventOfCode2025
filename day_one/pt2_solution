@@ -23,36 +23,36 @@ for input_line in $=dayone_input; do
   [ "$direction" = "R" ] && {
     # calculate zeros (100s)
     # floor result with integer div
-    (( zeros += (current_pos + steps) / 100 ))
+    ((zeros+=(current_pos+steps)/100))
 
     # update position
-    (( current_pos += steps ))
+    ((current_pos+=steps))
 
   } || {
     # if current pos is 0, distance to next 0 is 100
-    (( current_pos == 0 )) && {
+    ((current_pos==0)) && {
         dist_to_zero=100
     } || {
         dist_to_zero=$current_pos
     }
 
     # check if enough steps for first zero
-    (( steps >= dist_to_zero )) && {
-        (( zeros++ )) # We hit the first zero
+    ((steps>=dist_to_zero)) && {
+        ((zeros++)) # we hit first zero
 
         # calculate remaining steps after 1st zero
-        (( remaining = steps - dist_to_zero ))
+        ((remaining=steps-dist_to_zero))
 
         # increase zeros by 1 for every 100 steps remaining
-        (( zeros += remaining / 100 ))
+        ((zeros+=remaining/100))
     }
 
     # update position
-    (( current_pos -= steps ))
+    ((current_pos-=steps))
   }
 
   # normalize position to 0-99 (double modulo)
-  (( current_pos = (current_pos % 100 + 100) % 100 ))
+  ((current_pos=(current_pos%100+100)%100))
 
 done
 unset IFS

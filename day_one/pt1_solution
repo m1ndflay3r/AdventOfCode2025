@@ -25,18 +25,18 @@ for input_line in $=dayone_input; do
 
   # apply rotation
   [ "$direction" = 'R' ] && {
-    (( current_pos += steps ))
+    ((current_pos+=steps))
   } || {
-    (( current_pos -= steps ))
+    ((current_pos-=steps))
   }
 
   # normalize position within 0-99 using modulo.
   # add 100, modulo again to ensure index is positive
-  (( current_pos = (current_pos % 100 + 100) % 100 ))
+  ((current_pos=(current_pos%100+100)%100))
 
   # check if is pos. 0
-  (( current_pos == 0 )) && {
-    (( zeros++ ))
+  ((current_pos==0)) && {
+    ((zeros++))
   }
 
 done
