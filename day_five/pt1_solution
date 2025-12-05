@@ -58,10 +58,6 @@ create_worker() {
   fresh_flag=0
   # begin iterating over every range in ingredient_range array
   for chk_range in $ingredient_range[@]; do
-    # easy debug way to kill all workers
-    [ -f /tmp/dayfive_working/killworkers ] && {
-      break
-    }
     # separate range start and fin into their own variables
     range_start=''
     range_fin=''
