@@ -16,9 +16,9 @@ declare -A dayfour_input
 input_raw=$(< input)
 x_readin=0
 y_readin=0
-# fetch x length
+# x length
 ex_length=139
-# fetch y length
+# y length
 why_length=139
 IFS=$'\n'
 for y_line in $=input_raw; do
