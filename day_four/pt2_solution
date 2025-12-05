@@ -194,6 +194,7 @@ unset IFS
   rm oldresult
   rm input
   mv input.bak input
+  rm -rf /tmp/dayfour_working
 } || {
   print $result > oldresult
   print -n '' > input
@@ -214,7 +215,6 @@ unset IFS
       print -n $dayfour_input[$ex_cp_count,$why_cp_count] >> input
     done
   done
+  rm -rf /tmp/dayfour_working
+  ./pt2_solution
 }
-
-#cleanup
-rm -rf /tmp/dayfour_working
