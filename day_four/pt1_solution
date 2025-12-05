@@ -77,10 +77,15 @@ tally_adj() {
 }
 
 create_worker() {
-  ex=$ex why=$why tally_adj
-  ta_res=$?
-  ((ta_res<4)) && {
-    print '1' > /tmp/dayfour_working/$worker_id
+  indice_contains=$(2d_arr query dayfour_input $ex $why)
+  [[ "$indice_contains" = *'@'* ]] && {
+    ex=$ex why=$why tally_adj
+    ta_res=$?
+    ((ta_res<4)) && {
+      print '1' > /tmp/dayfour_working/$worker_id
+    } || {
+      print '0' > /tmp/dayfour_working/$worker_id
+    }
   } || {
     print '0' > /tmp/dayfour_working/$worker_id
   }
@@ -119,4 +124,9 @@ for final_tally in $worker_ids[@]; do
   }
 done
 
+# print results
 print $result
+
+#cleanup
+rm -rf /tmp/dayfour_working
+2d_arr del dayfour_input
