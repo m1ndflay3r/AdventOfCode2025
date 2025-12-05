@@ -109,7 +109,7 @@ done
 
 # tally results
 for le_tallie in $worker_ids[@]; do
-  worker_out=$(</tmp/dayfive_working/$worker_id)
+  worker_out=$(</tmp/dayfive_working/$le_tallie)
   [ "$worker_out" != 0 ] && {
     ((result++))
   }
@@ -119,4 +119,4 @@ done
 print $result
 
 # cleanup
-#rm -rf /tmp/dayfive_working
+rm -rf /tmp/dayfive_working
