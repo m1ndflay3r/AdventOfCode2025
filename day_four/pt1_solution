@@ -4,15 +4,37 @@
 
 # include zsh_libmisc, load needed library functions
 fpath=(/usr/lib/zsh_libmisc/libmisc.zwc $fpath)
-autoload 2d_arr
-autoload fox-fr
 autoload query_jobs
 
 # read puzzle input into 2d array, error if file 'input' not found
-fox-fr input | 2d_arr cr dayfour_input || {
+[ -f input ] || {
   print "Error: \'input\' not found"
   return 1
 }
+unset dayfour_input
+declare -A dayfour_input
+input_raw=$(< input)
+x_readin=0
+y_readin=0
+# fetch x length
+ex_length=139
+# fetch y length
+why_length=139
+IFS=$'\n'
+for y_line in $=input_raw; do
+  ((y_readin+=1))
+  while true; do
+    ((x_readin+=1))
+    x_indice=${y_line: :1}
+    y_line=${y_line:1}
+    [ -z "$x_indice" ] && {
+      x_readin=0
+      break
+    }
+    dayfour_input[$x_readin,$y_readin]=$x_indice
+  done
+done
+unset IFS
 
 # initialize worker_id var
 worker_id=0
@@ -35,12 +57,6 @@ why_pointer=0
 # initialize result var
 result=0
 
-# fetch x length
-ex_length=$(2d_arr qg dayfour_input -x)
-
-# fetch y length
-why_length=$(2d_arr qg dayfour_input -y)
-
 # set default thread count if j is undefined
 [ -z "$j" ] && {
   j=$((nproc+1))
@@ -50,19 +66,19 @@ why_length=$(2d_arr qg dayfour_input -y)
 
 # query one indice in every direction from current pos.
 query_hitbox() {
-  # defines array qh_directions as containing all compass directions
-  qh_directions=('n'
-                 'ne'
-                 'e'
-                 'se'
-                 's'
-                 'sw'
-                 'w'
-                 'nw'
+  # defines array qh_directions as containing all possible directions
+  qh_directions=(""$((ex-1))","$why""
+                 ""$((ex+1))","$why""
+                 ""$ex","$((why-1))""
+                 ""$ex","$((why+1))""
+                 ""$((ex-1))","$((why-1))""
+                 ""$((ex+1))","$((why+1))""
+                 ""$((ex-1))","$((why+1))""
+                 ""$((ex+1))","$((why-1))""
                 )
   # query one indice in every direction, print contents
-  for qh_dir in $=qh_directions; do
-    single=1 2d_arr qa dayfour_input $ex $why $qh_dir
+  for qh_dir in $qh_directions[@]; do
+    print $dayfour_input[$qh_dir]
   done
 }
 alias qh=query_hitbox
@@ -87,7 +103,7 @@ tally_adj() {
 
 create_worker() {
   # ensure current indice is @
-  indice_contains=$(2d_arr query dayfour_input $ex $why)
+  indice_contains=$dayfour_input[$ex,$why]
   [[ "$indice_contains" = *'@'* ]] && {
     # fetch total @ from tally_adj
     ex=$ex why=$why tally_adj
@@ -152,4 +168,3 @@ print $result
 
 #cleanup
 rm -rf /tmp/dayfour_working
-2d_arr del dayfour_input
