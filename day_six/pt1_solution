@@ -1,0 +1,88 @@
+#!/usr/bin/env zsh
+
+## env setup
+
+# load libmisc
+fpath=(/usr/lib/zsh_libmisc/libmisc.zwc $fpath)
+autoload revstr
+
+# read puzzle input into variable, error if input not found
+daysix_input=$(<input) || {
+  print "Error: \'input\' not found"
+  return 1
+}
+
+# replace multi-space with single space for easy parsing
+until [[ "$daysix_input" != *'  '* ]]; do
+  daysix_input=${daysix_input//'  '/' '}
+done
+
+# declare raw working array
+declare -A daysix_working_raw
+
+# sort (flip) input using associative array
+whie_count=0
+IFS=$'\n'
+for input_line in $=daysix_input; do
+  ((whie_count++))
+  ecks_count=0
+  IFS=$' '
+  for indice in $=input_line; do
+    ((ecks_count++))
+    daysix_working_raw[$ecks_count,$whie_count]="$indice"
+  done
+  unset IFS
+done
+unset IFS
+
+# declare working array
+declare -a daysix_working
+
+#convert from associative array to linear array
+indice_count=0
+while true; do
+  ((indice_count++))
+  ((indice_count>ecks_count)) && {
+    break
+  }
+  # fetch indice keys for working indice
+  indice_keys=$daysix_working_raw[(I)$indice_count,*]
+  # iterate over each indice, add to working arr
+  IFS=$' '
+  for indice in $=indice_keys; do
+    daysix_working[$indice_count]=""$daysix_working[$indice_count]" "$daysix_working_raw[$indice]""
+  done
+  unset IFS
+done
+
+# initialize results var
+result=0
+
+## main
+
+# iterate over each working indice in daysix_working
+for working_indice in $daysix_working[@]; do
+  # trim leading space if present
+  [ "${working_indice: :1}" = ' ' ] && {
+    working_indice=${working_indice:1}
+  }
+  # reverse string; take operator; reverse back
+  print $working_indice
+  working_indice=$(revstr $working_indice)
+  operator=${working_indice: :1}
+  working_indice=${working_indice:1}
+  [ "${working_indice: :1}" = ' ' ] && {
+    working_indice=${working_indice:1}
+  }
+  working_indice=$(revstr $working_indice)
+  print $working_indice
+  working_indice=${working_indice//' '/"$operator"}
+  print $working_indice
+  ((result+=($working_indice))) || {
+    print "$working_indice"
+    break
+  }
+done
+
+# print result
+print $result
