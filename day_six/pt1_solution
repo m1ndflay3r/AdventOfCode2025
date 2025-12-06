@@ -49,7 +49,7 @@ while true; do
   indice_keys=$daysix_working_raw[(I)$indice_count,*]
   # iterate over each indice, add to working arr
   IFS=$' '
-  for indice in $=indice_keys; do
+  for indice in ${(@on)=indice_keys}; do
     daysix_working[$indice_count]=""$daysix_working[$indice_count]" "$daysix_working_raw[$indice]""
   done
   unset IFS
@@ -66,22 +66,21 @@ for working_indice in $daysix_working[@]; do
   [ "${working_indice: :1}" = ' ' ] && {
     working_indice=${working_indice:1}
   }
-  # reverse string; take operator; reverse back
-  print $working_indice
+  # reverse string
   working_indice=$(revstr $working_indice)
+  # grab operator, trim from reversed string
   operator=${working_indice: :1}
   working_indice=${working_indice:1}
+  # if first char of reversed string is space (usually is), remove one more char
   [ "${working_indice: :1}" = ' ' ] && {
     working_indice=${working_indice:1}
   }
+  # reverse string again to reorient it
   working_indice=$(revstr $working_indice)
-  print $working_indice
+  # replace all spaces in string with operator
   working_indice=${working_indice//' '/"$operator"}
-  print $working_indice
-  ((result+=($working_indice))) || {
-    print "$working_indice"
-    break
-  }
+  # calculate equation, add results to result
+  ((result+=($working_indice)))
 done
 
 # print result
