@@ -1,0 +1,62 @@
+#!/usr/bin/env zsh
+
+## env setup
+
+# read puzzle input up to line DIVIDE into dayfive_input, sort from smallest to largest
+dayfive_input=("${(@f)$(sed '/DIVIDE/q' input | head -n -1 | grep '[0-9]' | sort -t '-' -k1,1n)}") || {
+  print "Error: unable to find \'input\'"
+  return 1
+}
+
+# initialize result variable
+result=0
+
+## main
+
+# parse first line
+var_of_holding=$dayfive_input[1,1]
+# extract current_start and current_fin from var_of_holding
+current_start=''
+current_fin=''
+IFS=$'-'
+for num_range in $=var_of_holding; do
+  [ -z "$current_start" ] && {
+    current_start="$num_range"
+  } || {
+    current_fin="$num_range"
+  }
+done
+unset IFS
+
+# parse subsequent lines, merge overlaps
+for chk_range in $dayfive_input[2,-1]; do
+  # extract chk_start and chk_fin from chk_range
+  chk_start=''
+  chk_fin=''
+  IFS=$'-'
+  for num_range in $=chk_range; do
+    [ -z "$chk_start" ] && {
+      chk_start="$num_range"
+    } || {
+      chk_fin="$num_range"
+    }
+  done
+  unset IFS
+  # gap detected - do end - start + 1 and add to result, set chk_start and chk_fin to new current start / fin
+  ((chk_start>current_fin)) && {
+    ((result+=(current_fin-current_start+1)))
+    current_start="$chk_start"
+    current_fin="$chk_fin"
+  # gapless detected - merge number ranges
+  } || {
+    ((current_fin<chk_fin)) && {
+      current_fin="$chk_fin"
+    }
+  }
+done
+
+# tally final range
+((result+=(current_fin-current_start+1)))
+
+# print results
+print $result
