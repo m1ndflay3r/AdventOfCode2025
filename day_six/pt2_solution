@@ -1,0 +1,87 @@
+#!/usr/bin/env zsh
+
+## env setup
+
+# include libmisc, load needed library functions
+fpath=(/usr/lib/zsh_libmisc/libmisc.zwc $fpath)
+autoload revstr
+
+# read puzzle input into variable, err if not exist
+daysix_input=$(<input) || {
+  print "Error: \'input\' not found"
+  return 1
+}
+
+# declare associative array
+declare -A daysix_input_raw
+
+# initialize result var
+result=0
+
+# read into associative array char by char
+eks_count=0
+IFS=$'\n'
+for input_line in $=daysix_input; do
+  ((eks_count++))
+  input_line=$(revstr $input_line)
+  why_count=0
+  while true; do
+    input_char=${input_line: :1}
+    input_line=${input_line:1}
+    [ -z "$input_char" ] && {
+      break
+    }
+    ((why_count++))
+    daysix_input_raw[$why_count,$eks_count]="$input_char"
+  done
+done
+unset IFS
+
+## helper functions
+
+print_flipped() {
+  loopfirst=0
+  somemyaah=$daysix_input_raw[(I)*,*]
+  for key in ${(@on)=somemyaah}; do
+    [[ "$key" = *",1" ]] && [ "$loopfirst" = 1 ] && {
+      print
+    }
+    to_print=$daysix_input_raw[$key]
+    to_print=${to_print//' '/''}
+    print -n "$to_print"
+    loopfirst=1
+  done
+}
+
+flipped=$(print_flipped)
+
+print_cleaned() {
+  IFS=$'\n\n'
+  for le_print in $=flipped; do
+    print -n ""$le_print" "
+  done
+  unset IFS
+}
+
+cleaned=$(print_cleaned)
+daysix_working=${cleaned//'  '/$'\n'}
+
+## main
+
+# iterate over each line
+IFS=$'\n'
+for operation in $=daysix_working; do
+  operation=$(revstr "$operation")
+  operand=${operation: :1}
+  [ "$operand" = ' ' ] && {
+    operation=${operation:1}
+    operand=${operation: :1}
+  }
+  operation=${operation:1}
+  operation=$(revstr "$operation")
+  operation=${operation//' '/"$operand"}
+  ((result+=($operation)))
+done
+unset IFS
+
+print $result
