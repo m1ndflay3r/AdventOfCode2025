@@ -19,19 +19,24 @@ declare -A daysix_input_raw
 result=0
 
 # read into associative array char by char
+# since this is 90 degree flipped, we can unflip it with some math
 eks_count=0
 IFS=$'\n'
 for input_line in $=daysix_input; do
+  # increase x count, reverse string
   ((eks_count++))
   input_line=$(revstr $input_line)
   why_count=0
   while true; do
+    # pop one char off of input_line
     input_char=${input_line: :1}
     input_line=${input_line:1}
     [ -z "$input_char" ] && {
       break
     }
+    # increase y count
     ((why_count++))
+    # add to associative array
     daysix_input_raw[$why_count,$eks_count]="$input_char"
   done
 done
@@ -39,13 +44,18 @@ unset IFS
 
 ## helper functions
 
+# print the flipped associative array (sorted key parsing)
 print_flipped() {
   loopfirst=0
-  somemyaah=$daysix_input_raw[(I)*,*]
-  for key in ${(@on)=somemyaah}; do
+  # acquire input keys
+  input_keys=$daysix_input_raw[(I)*,*]
+  # iterate through keys, numeric sorted
+  for key in ${(@on)=input_keys}; do
+    # print newline if is first x indice of this y coord, unless is first loop
     [[ "$key" = *",1" ]] && [ "$loopfirst" = 1 ] && {
       print
     }
+    # print data corresponding to key, removing spaces
     to_print=$daysix_input_raw[$key]
     to_print=${to_print//' '/''}
     print -n "$to_print"
@@ -53,8 +63,10 @@ print_flipped() {
   done
 }
 
+# save output of above to $flipped
 flipped=$(print_flipped)
 
+# normalize newline to space
 print_cleaned() {
   IFS=$'\n\n'
   for le_print in $=flipped; do
@@ -63,6 +75,7 @@ print_cleaned() {
   unset IFS
 }
 
+# replace double space (former double newline) with newline
 cleaned=$(print_cleaned)
 daysix_working=${cleaned//'  '/$'\n'}
 
@@ -71,17 +84,25 @@ daysix_working=${cleaned//'  '/$'\n'}
 # iterate over each line
 IFS=$'\n'
 for operation in $=daysix_working; do
+  # reverse string
   operation=$(revstr "$operation")
+  # pop one char off, use for operand
   operand=${operation: :1}
+  # if is space, something weird happened. Trim by one, repeat process
   [ "$operand" = ' ' ] && {
     operation=${operation:1}
     operand=${operation: :1}
   }
+  # trim operand off of operation
   operation=${operation:1}
+  # flip back to right orientation
   operation=$(revstr "$operation")
+  # replace spaces with operand
   operation=${operation//' '/"$operand"}
+  # evaluate expression, add result to result var
   ((result+=($operation)))
 done
 unset IFS
 
+# print results
 print $result
