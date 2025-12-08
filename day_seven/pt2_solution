@@ -152,6 +152,7 @@ for ((why=begin_why; why<=why_count; why++)); do
     count=$le_beam[$eks]
     # fetch current indice
     indice=$dayseven_grid[$why,$eks]
+    [ -z "$indice" ] && continue
     # if indice is splitter
     [ "$indice" = '^' ] && {
       target=$((eks-1))
