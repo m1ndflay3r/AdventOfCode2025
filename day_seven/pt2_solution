@@ -115,6 +115,23 @@ print_y() {
   unset IFS
 }
 
+chonky_adder() {
+  local a=$1 b=$2 sum="" carry=0
+  local i j digit_a digit_b temp_sum
+  # loop from the end of strings to the beginning
+  for (( i=${#a}, j=${#b}; i>0 || j>0 || carry>0; i--, j-- )); do
+    # get digit or 0 if index exhausted
+    digit_a=${${a[i]}:-0}
+    digit_b=${${b[j]}:-0}
+    # add digits plus carry
+    (( temp_sum = digit_a + digit_b + carry ))
+    # update carry and current digit
+    (( carry = temp_sum / 10 ))
+    sum="$(( temp_sum % 10 ))$sum"
+  done
+  print $sum
+}
+
 ## main
 
 # fetch start coords
@@ -136,11 +153,13 @@ for ((why=begin_why; why<=why_count; why++)); do
     indice=$dayseven_grid[$why,$eks]
     # if indice is splitter
     [ "$indice" = '^' ] && {
-      ((le_nu_beam[$((eks-1))]+=count))
-      ((le_nu_beam[$((eks+1))]+=count))
+      target=$((eks-1))
+      le_nu_beam[$target]=$(chonky_adder ${le_nu_beam[$target]} $count)
+      target=$((eks+1))
+      le_nu_beam[$target]=$(chonky_adder ${le_nu_beam[$target]} $count)
     # if indice not splitter
     } || {
-      ((le_nu_beam[$eks]+=count))
+      le_nu_beam[$eks]=$(chonky_adder ${le_nu_beam[$eks]} $count)
     }
   done
   # replace beam array contents with next beam array contents
@@ -152,8 +171,8 @@ for ((why=begin_why; why<=why_count; why++)); do
 done
 
 # tally results
-for le_tallie in $le_beam; do
-  ((result+=le_tallie))
+for le_tallie in ${(@v)le_beam}; do
+  result=$(chonky_adder $result $le_tallie)
 done
 
 # print results
