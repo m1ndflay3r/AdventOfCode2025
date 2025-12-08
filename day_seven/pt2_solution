@@ -11,29 +11,29 @@ dayseven_input=$(<input) || {
 # declare associative array
 declare -A dayseven_grid
 
-# declare counts array
-declare -A counts
-
 # parse input line by line, read into associative array
-why_count=0
+y_count=0
 IFS=$'\n'
 for input_line in $=dayseven_input; do
-  ((why_count++))
-  eks_count=0
+  ((y_count++))
+  x_count=0
   while true; do
     working_indice=${input_line: :1}
     input_line=${input_line:1}
     [ -z "$working_indice" ] && {
       break
     }
-    ((eks_count++))
-    dayseven_grid[$why_count,$eks_count]=$working_indice
+    ((x_count++))
+    dayseven_grid[$y_count,$x_count]=$working_indice
   done
 done
 unset IFS
 
 # initialize result var
 result=0
+
+# initialize linear buffer
+declare -a buffer
 
 ## helper functions
 
@@ -49,51 +49,69 @@ search_grid() {
   unset IFS
 }
 
-## main
-
-# find start pos
-begin_key=$(search_char='S' search_grid)
-# initialize timeline count
-counts[$begin_key]=1
-
-# iterate through rows (gravity) from top to bottom
-for ((why=1; why<=why_count; why++)); do
-  # fetch active positions in current row
-  row_keys=(${(k)counts[(I)${why},*]})
-  for key in $row_keys; do
-    current_count=$counts[$key]
-    # fetch current x coord
-    eks=${key#*,}
-    # calculate coordinates for row below
-    next_why=$((why+1))
-    # check the character directly below current position
-    char_below=$dayseven_grid[$next_why,$eks]
-    [[ "$char_below" = "." || "$char_below" = "S" ]] && {
-      # pass count straight down
-      ((counts[$next_why,$eks]+=current_count))
-    } || {
-      [[ "$char_below" = "^" ]] && {
-        # timeline split - add count to left and right on next row
-        ((counts[$next_why,$((eks-1))]+=current_count))
-        ((counts[$next_why,$((eks+1))]+=current_count))
-      }
+# extract x coord only from key
+print_x() {
+  firstloop=0
+  IFS=$','
+  for coord in $=key; do
+    [ "$firstloop" = 1 ] && {
+      print $coord
     }
+    firstloop=1
   done
-done
-
-# fetch keys < grid bottom
-final_why=$((why_count+1))
-final_keys=(${(k)counts[(I)${final_why},*]})
-
-# if stop on last row, change final_why to $why_count
-[ ${#final_keys} -eq 0 ] && {
-  final_why=$why_count
-  final_keys=(${(k)counts[(I)${final_why},*]})
+  unset IFS
 }
 
-for key in $final_keys; do
-  ((result+=counts[$key]))
-done
+# extract y coord only from key
+print_y() {
+  firstloop=0
+  IFS=$','
+  for coord in $=key; do
+    [ "$firstloop" = 0 ] && {
+      print $coord
+    }
+    firstloop=1
+  done
+  unset IFS
+}
 
-# print result
+## main
+
+# acquire starting pos.
+key=$(search_char='S' search_grid)
+
+# count first beam
+buffer[$(print_x)]=1
+
+# acquire splitter list
+splitters=$(search_char='^' search_grid)
+
+# iterate over splitters
+IFS=$'\n'
+for splitter in $=splitters; do
+  # fetch splitter x coord
+  splitter_x=$(key=$splitter print_x)
+  # copy buffer[splitter] to placeholder variable
+  placeholder=$buffer[$splitter_x]
+  # set buffer[splitter] to zero
+  buffer[$splitter_x]=0
+  # set x coords to current splitter - 1
+  ((splitter_x-=1))
+  # copy buffer[splitter-1] to targ variable
+  targ=$buffer[$splitter_x]
+  # set buffer[splitter-1] to targ + placeholder
+  buffer[$splitter_x]=$((targ+placeholder))
+  # set x coords to current splitter + 1
+  ((splitter_x+=2))
+  # copy buffer[splitter+1] to targ variable
+  targ=$buffer[$splitter_x]
+  # set buffer[splitter+1] to targ + placeholder
+  buffer[$splitter_x]=$((targ+placeholder))
+done
+unset IFS
+
+# tally + print result
+for res in $buffer[@]; do
+  ((result+=res))
+done
 print $result
