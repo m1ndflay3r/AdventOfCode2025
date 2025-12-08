@@ -81,7 +81,7 @@ for ((why=1; why<=why_count; why++)); do
   done
 done
 
-# fetch keys > grid bottom
+# fetch keys < grid bottom
 final_why=$((why_count+1))
 final_keys=(${(k)counts[(I)${final_why},*]})
 
