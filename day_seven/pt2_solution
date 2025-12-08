@@ -1,0 +1,160 @@
+#!/usr/bin/env zsh
+
+## env setup
+
+# read input into variable, error if not found
+dayseven_input=$(<input) || {
+  print "Error: \'input\' not found"
+  return 1
+}
+
+# declare associative array
+declare -A dayseven_grid
+
+# parse input line by line, read into associative array
+why_count=0
+IFS=$'\n'
+for input_line in $=dayseven_input; do
+  ((why_count++))
+  eks_count=0
+  while true; do
+    working_indice=${input_line: :1}
+    input_line=${input_line:1}
+    [ -z "$working_indice" ] && {
+      break
+    }
+    ((eks_count++))
+    dayseven_grid[$why_count,$eks_count]=$working_indice
+  done
+done
+unset IFS
+
+# initialize result var
+result=0
+
+## helper functions
+
+# print entire contents of grid
+print_grid() {
+  # grab dayseven_grid keys
+  dg_keys=$dayseven_grid[(I)*,*]
+  first_loop=0
+  IFS=$' '
+  for key in ${(@on)=dg_keys}; do
+    [[ "$key" = *",1" ]] && [ "$first_loop" = 1 ] && {
+      print
+    }
+    print -n $dayseven_grid[$key]
+    first_loop=1
+  done
+  unset IFS
+}
+
+# search grid by char
+search_grid() {
+  dg_keys=$dayseven_grid[(I)*,*]
+  IFS=$' '
+  for key in ${(@on)=dg_keys}; do
+    [ "$dayseven_grid[$key]" = "$search_char" ] && {
+      print $key
+    }
+  done
+  unset IFS
+}
+
+# modify one part of a key, either x or y
+modif_key() {
+  ret_x=''
+  ret_y=''
+  firstloop=0
+  IFS=$','
+  for coord in $=key; do
+    [ "$firstloop" = 0 ] && {
+      [ "$Y" = 1 ] && {
+        ret_y="$y"
+      } || {
+        ret_y="$coord"
+      }
+    }
+    [ "$firstloop" = 1 ] && {
+      [ "$X" = 1 ] && {
+        ret_x="$x"
+      } || {
+        ret_x="$coord"
+      }
+    }
+    firstloop=1
+  done
+  unset IFS
+  print ""$ret_y","$ret_x""
+}
+
+# extract x coord only from key
+print_x() {
+  firstloop=0
+  IFS=$','
+  for coord in $=key; do
+    [ "$firstloop" = 1 ] && {
+      print $coord
+    }
+    firstloop=1
+  done
+  unset IFS
+}
+
+# extract y coord only from key
+print_y() {
+  firstloop=0
+  IFS=$','
+  for coord in $=key; do
+    [ "$firstloop" = 0 ] && {
+      print $coord
+    }
+    firstloop=1
+  done
+  unset IFS
+}
+
+## main
+
+# fetch start coords
+begin_key=$(search_char='S' search_grid)
+begin_eks=$(key=$start_key print_x)
+begin_why=$(key=$start_key print_y)
+
+# initialize beam array
+declare -A le_beam
+le_beam[$begin_eks]=1
+
+# propagation loop
+for ((why=begin_why; why<=why_count; why++)); do
+  declare -A le_nu_beam
+  # iterate over active columns in curr. row
+  for eks in ${(k)le_beam}
+    count=$le_beam[$eks]
+    # fetch current indice
+    indice=$dayseven_grid[$why,$eks]
+    # if indice is splitter
+    [ "$indice" = '^' ] && {
+      ((le_nu_beam[$((eks-1))]+=count))
+      ((le_nu_beam[$((eks+1))]+=count))
+    # if indice not splitter
+    } || {
+      ((le_nu_beam[$eks]+=count))
+    }
+  done
+  # replace beam array contents with next beam array contents
+  unset le_beam
+  declare -A le_beam
+  for key in ${(k)le_nu_beam}; do
+    le_beam[$key]=$le_nu_beam[$key]
+  done
+done
+
+# tally results
+for le_tallie in $le_beam; do
+  ((result+=count))
+done
+
+# print results
+print $result
