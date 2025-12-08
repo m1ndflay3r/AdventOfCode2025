@@ -68,11 +68,11 @@ for ((why=1; why<=why_count; why++)); do
     next_why=$((why+1))
     # check the character directly below current position
     char_below=$dayseven_grid[$next_why,$eks]
-    ([ "$char_below" = "." ] || [ "$char_below" = "S" ]) && {
+    [[ "$char_below" = "." || "$char_below" = "S" ]] && {
       # pass count straight down
       ((counts[$next_why,$eks]+=current_count))
     } || {
-      [ "$char_below" = "^" ] && {
+      [[ "$char_below" = "^" ]] && {
         # timeline split - add count to left and right on next row
         ((counts[$next_why,$((eks-1))]+=current_count))
         ((counts[$next_why,$((eks+1))]+=current_count))
