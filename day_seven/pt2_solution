@@ -118,7 +118,7 @@ print_y() {
 chonky_adder() {
   local a=$1 b=$2 sum="" carry=0
   local i j digit_a digit_b temp_sum
-  # loop from the end of strings to the beginning
+  # loop from end of strings to beginning
   for (( i=${#a}, j=${#b}; i>0 || j>0 || carry>0; i--, j-- )); do
     # get digit or 0 if index exhausted
     digit_a=${${a[i]}:-0}
@@ -145,6 +145,7 @@ le_beam[$begin_eks]=1
 
 # propagation loop
 for ((why=begin_why; why<=why_count; why++)); do
+  unset le_nu_beam
   declare -A le_nu_beam
   # iterate over active columns in curr. row
   for eks in ${(k)le_beam}; do
