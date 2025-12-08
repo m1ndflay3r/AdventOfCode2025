@@ -119,8 +119,8 @@ print_y() {
 
 # fetch start coords
 begin_key=$(search_char='S' search_grid)
-begin_eks=$(key=$start_key print_x)
-begin_why=$(key=$start_key print_y)
+begin_eks=$(key=$begin_key print_x)
+begin_why=$(key=$begin_key print_y)
 
 # initialize beam array
 declare -A le_beam
@@ -130,7 +130,7 @@ le_beam[$begin_eks]=1
 for ((why=begin_why; why<=why_count; why++)); do
   declare -A le_nu_beam
   # iterate over active columns in curr. row
-  for eks in ${(k)le_beam}
+  for eks in ${(k)le_beam}; do
     count=$le_beam[$eks]
     # fetch current indice
     indice=$dayseven_grid[$why,$eks]
@@ -153,7 +153,7 @@ done
 
 # tally results
 for le_tallie in $le_beam; do
-  ((result+=count))
+  ((result+=le_tallie))
 done
 
 # print results
