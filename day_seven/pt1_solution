@@ -29,15 +29,153 @@ for input_line in $=dayseven_input; do
 done
 unset IFS
 
-# grab dayseven_grid keys
-dg_keys=$dayseven_grid[(I)*,*]
-first_loop=0
-IFS=$' '
-for key in ${(on)=dg_keys}; do
-  [[ "$key" = *",1" ]] && [ "$first_loop" = 1 ] && {
-    print
+# initialize result var
+result=0
+
+## helper functions
+
+# print entire contents of grid
+print_grid() {
+  # grab dayseven_grid keys
+  dg_keys=$dayseven_grid[(I)*,*]
+  first_loop=0
+  IFS=$' '
+  for key in ${(@on)=dg_keys}; do
+    [[ "$key" = *",1" ]] && [ "$first_loop" = 1 ] && {
+      print
+    }
+    print -n $dayseven_grid[$key]
+    first_loop=1
+  done
+  unset IFS
+}
+
+# search grid by char
+search_grid() {
+  dg_keys=$dayseven_grid[(I)*,*]
+  IFS=$' '
+  for key in ${(@on)=dg_keys}; do
+    [ "$dayseven_grid[$key]" = "$search_char" ] && {
+      print $key
+    }
+  done
+  unset IFS
+}
+
+# modify one part of a key, either x or y
+modif_key() {
+  ret_x=''
+  ret_y=''
+  firstloop=0
+  IFS=$','
+  for coord in $=key; do
+    [ "$firstloop" = 0 ] && {
+      [ "$Y" = 1 ] && {
+        ret_y="$y"
+      } || {
+        ret_y="$coord"
+      }
+    }
+    [ "$firstloop" = 1 ] && {
+      [ "$X" = 1 ] && {
+        ret_x="$x"
+      } || {
+        ret_x="$coord"
+      }
+    }
+    firstloop=1
+  done
+  unset IFS
+  print ""$ret_y","$ret_x""
+}
+
+# extract x coord only from key
+print_x() {
+  firstloop=0
+  IFS=$','
+  for coord in $=key; do
+    [ "$firstloop" = 1 ] && {
+      print $coord
+    }
+    firstloop=1
+  done
+  unset IFS
+}
+
+# extract y coord only from key
+print_y() {
+  firstloop=0
+  IFS=$','
+  for coord in $=key; do
+    [ "$firstloop" = 0 ] && {
+      print $coord
+    }
+    firstloop=1
+  done
+  unset IFS
+}
+
+## main
+
+# acquire starting pos.
+key=$(key=$(search_char='S' search_grid) Y=1 y=$(($(print_y)+1)) modif_key)
+
+# propagate first beam
+dayseven_grid[$key]='|'
+
+# acquire splitter list
+splitters=$(search_char='^' search_grid)
+
+# beam propagation loop
+while true; do
+  # save copy of previous grid
+  old_grid="$(print_grid)"
+  beam_list=$(search_char='|' search_grid)
+  # BEAM LOOP - iterate though beam list
+  IFS=$'\n'
+  for beam in $=beam_list; do
+    # fetch key for indice directly below beam
+    chk_key=$(key=$beam Y=1 y=$(($(print_y)+1)) modif_key)
+    # if indice is ., propagate down
+    [ "$dayseven_grid[$chk_key]" = '.' ] && {
+      dayseven_grid[$chk_key]='|'
+    }
+  done
+  unset IFS
+  # SPLITTER LOOP - iterate through list of splitters
+  IFS=$'\n'
+  for splitter in $=splitters; do
+    # fetch key for indice directly above splitter
+    chk_key=$(key=$splitter Y=1 y=$(($(print_y)-1)) modif_key)
+    # if indice is beam
+    [ "$dayseven_grid[$chk_key]" = '|' ] && {
+      # get key_l
+      key_l=$(key=$splitter X=1 x=$(($(print_x)-1)) modif_key)
+      # get key r
+      key_r=$(key=$splitter X=1 x=$(($(print_x)+1)) modif_key)
+      # populate l and r positions
+      dayseven_grid[$key_l]='|'
+      dayseven_grid[$key_r]='|'
+    }
+  done
+  unset IFS
+  # if old_grid = new_grid, then we're finished propagating and can break loop
+  [ "$old_grid" = "$(print_grid)" ] && {
+    break
   }
-  print -n $dayseven_grid[$key]
-  first_loop=1
+done
+
+# tally up results
+IFS=$'\n'
+for splitter in $=splitters; do
+  # fetch key for indice directly above splitter
+  chk_key=$(key=$splitter Y=1 y=$(($(print_y)-1)) modif_key)
+  # if indice is beam
+  [ "$dayseven_grid[$chk_key]" = '|' ] && {
+    ((result++))
+  }
 done
 unset IFS
+
+# print result
+print $result
