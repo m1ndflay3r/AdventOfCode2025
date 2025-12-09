@@ -37,10 +37,10 @@ print "Calculating distances..."
 integer count_a=0
 integer edge_idx=0
 
-while (( count_a < junctions )); do
+while ((count_a < junctions)); do
   ((count_a++))
   integer count_b=$count_a
-  while (( count_b < junctions )); do
+  while ((count_b < junctions)); do
     ((count_b++))
 
     typeset -F x1=$x[$count_a] y1=$y[$count_a] z1=$z[$count_a]
