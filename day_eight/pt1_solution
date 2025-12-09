@@ -2,175 +2,121 @@
 
 ## env setup
 
-# read puzzle input into variable, err if not found
+# load zsh/mathfunc module
+zmodload zsh/mathfunc
+
+# read input into variable, err if not found
 dayeight_input=$(<input) || {
-  print "Error: unable to find \'input\'"
+  print "Error: could not find \'input\'"
   return 1
 }
 
-# alias for brevity
-alias int="integer"
+# declare linear arrays for x y z
+declare -a x y z
 
-# declare arrays
-declare -a parent size distances final_tally x y z
+# declare associative array for distances
+declare -A distances
 
-# initialize connections
-int connections=0
+# initialize junctions to 0
+junctions=0
 
 ## helper functions
 
-# extract x coord only from key
-print_x() {
-  firstloop=0
-  IFS=$','
-  for coord in $=key; do
-    out=$coord
-  done
-  unset IFS
-  print $out
-}
 
-# extract y coord only from key
-print_y() {
-  firstloop=0
-  IFS=$','
-  for coord in $=key; do
-    [ "$firstloop" = 1 ] && {
-      print $coord
-      break
-    }
-    firstloop=1
-  done
-  unset IFS
-}
+## parsing steps
 
-# extract z coord only from key
-print_z() {
-  firstloop=0
-  IFS=$','
-  for coord in $=key; do
-    print $coord
-    break
-  done
-  unset IFS
-}
-
-# distance calculator
-get_dist() {
-  int key1=$1
-  int key2=$2
-  ret=$3
-  int kx=$((x[key1]-x[key2]))
-  int ky=$((y[key1]-y[key2]))
-  int kz=$((z[key1]-z[key2]))
-  int dist=$(((kx*kx)+(ky*ky)+(kz*kz)))
-  eval "$ret=$dist"
-}
-
-find_root() {
-  int working=$i
-  ret=$2
-  int root=$working
-  while ((parent[root] != root)); do
-    root=$parent[root]
-  done
-  int curr=$working
-  while ((curr != root)); do
-    int next=$parent[curr]
-    parent[curr]=$root
-    curr=$next
-  done
-  eval "$ret=$root"
-}
-
-## parse steps
-
-junctions=0
-
+# parse input by newline
 IFS=$'\n'
-for key in $=dayeight_input; do
+for input_line in $=dayeight_input; do
+  # increase junctions count
   ((junctions++))
-  x[$junctions]=$(print_x)
-  y[$junctions]=$(print_y)
-  z[$junctions]=$(print_z)
+  # ensure X Y and Z are blank
+  X=''
+  Y=''
+  Z=''
+  # set IFS to ',' to further parse each line
+  IFS=$','
+  for coord in $=input_line; do
+    # if Z is blank, must be Y (first coord)
+    [ -z "$Z" ] && {
+      Z=$coord
+    # elif Y is blank, must by Y (second coord)
+    } || {
+      [ -z "$Y" ] && {
+        Y=$coord
+      # else must be X (third coord)
+      } || {
+        X=$coord
+      }
+    }
+  done
+  unset IFS
+  # add current $Z, $Y, and $X to their respective linear arrays at indice $junctions
+  z[$junctions]="$Z"
+  y[$junctions]="$Y"
+  x[$junctions]="$X"
 done
 unset IFS
 
-print "parsed "$junctions" junctions"
-
 ## main
 
-box_a=0
-while true; do
-  ((box_a++))
-  ((box_a>junctions)) && {
-    break
-  }
-  box_b=$((box_a+1))
+count_a=0
+# iterate over input by newline once more
+IFS=$'\n'
+for input_line in $=dayeight_input; do
+  # increase count_a by 1, unset oldroot, set count_b to count_a
+  ((count_a++))
+  unset oldroot
+  count_b=0
   while true; do
-    ((box_b>junctions)) && {
+    # increase count_b by 1, and break if exceeds total junctions
+    ((count_b++))
+    # cant check distance against self - increase count by 1 again
+    [ "$count_a" = "$count_b" ] && {
+      ((count_b++))
+    }
+    ((count_b>junctions)) && {
       break
     }
-    int le_value
-    get_dist $box_a $box_b le_value
-    distances+="$le_value:$box_a:$box_b"
-    ((box_b++))
-  done
-done
-
-print "Sorting..."
-distances=("${(@on)distances}")
-
-print "top 5 closest pairs"
-print -l ${distances[1,5]}
-
-# we know our code works up to here
-
-count=0
-while true; do
-  ((count++))
-  ((count>junctions)) && {
-    break
-  }
-  parent[$count]=$count
-  size[$count]=1
-done
-
-for edge in "${distances[1,1000]}"; do
-  le_dist=''
-  you=''
-  vee=''
-  IFS=':' read -r le_dist you vee <<< "$edge"
-  int root_you root_vee
-  find_root $you root_you
-  find_root $vee root_vee
-  ((root_you != root_v)) && {
-    ((size[root_you]<size[root_vee])) && {
-      parent[root_you]=$root_vee
-      ((size[root_vee]+=size[root_you]))
+    # extract z1, y1, x1, z2, y2, and x2 from linear arrays using count_a and count_b
+    z1=$z[$count_a]; y1=$y[$count_a]; x1=$x[$count_a]
+    z2=$z[$count_b]; y2=$y[$count_b]; x2=$x[$count_b]
+    # calculate distance
+    # x2-x1 squared
+    x_res=$(((x2-x1)*(x2-x1)))
+    # y2-y1 squared
+    y_res=$(((y2-y1)*(y2-y1)))
+    # z2-z1 squared
+    z_res=$(((z2-z1)*(z2-z1)))
+    # add results of above together into variable to_root
+    to_root=$((x_res+y_res+z_res))
+    # set root to square root of to_root
+    ((root=sqrt(to_root)))
+    # if oldroot not empty, this is not first loop
+    ! [ -z "$oldroot" ] && {
+      # if root is smaller than oldroot, it becomes new oldroot.
+      ((root<oldroot)) && {
+        oldroot="$root"
+        # record count_b corresponding to current smallest
+        closest="$count_b"
+      }
+    # else must be first loop, so oldroot and closest = current root and count_b
     } || {
-      parent[root_vee]=$root_you
-      ((size[root_you+=size[root_vee]))
+      oldroot="$root"
+      closest="$count_b"
     }
-    ((connections++))
-  }
+  done
+  # reconstruct key of closest junction
+  clos_key=""$z[$closest]","$y[$closest]","$z[$closest]""
+  # save calculated distance + key of closest junction to distances, corresponding to current junction
+  distances[$input_line]=""$oldroot" "$clos_key""
 done
+unset IFS
 
-count=0
-while true; do
-  ((count++))
-  ((count>junctions)) && {
-    break
-  }
-  [ $parent[count] = "$count" ] && {
-    final_tally+=${size[count]}
-  }
+# print distances recorded
+distance_keys=$distances[(I)*,*,*]
+IFS=$' '
+for key in ${(@on)=distance_keys}; do
+  print $distances[$key]
 done
-
-final_tally=("${(@on)final_tally}")
-
-print "Largest circuits: ${final_tally[1]} ${final_tally[2]} ${final_tally[3]}"
-
-int result=$((final_tally[1]*final_tally[2]*final_tally[3]))
-
-print $result
+unset IFS
