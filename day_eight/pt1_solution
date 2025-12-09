@@ -2,121 +2,151 @@
 
 ## env setup
 
-# load zsh/mathfunc module
+# load zsh/mathfunc
 zmodload zsh/mathfunc
 
-# read input into variable, err if not found
+# read input, error if not found
 dayeight_input=$(<input) || {
   print "Error: could not find \'input\'"
   return 1
 }
 
-# declare linear arrays for x y z
-declare -a x y z
-
-# declare associative array for distances
-declare -A distances
-
-# initialize junctions to 0
-junctions=0
-
-## helper functions
-
+declare -a x y z parent size all_edges
+integer junctions=0
 
 ## parsing steps
 
-# parse input by newline
+print "Parsing input..."
+
 IFS=$'\n'
 for input_line in $=dayeight_input; do
-  # increase junctions count
   ((junctions++))
-  # ensure X Y and Z are blank
-  X=''
-  Y=''
-  Z=''
-  # set IFS to ',' to further parse each line
-  IFS=$','
-  for coord in $=input_line; do
-    # if Z is blank, must be Y (first coord)
-    [ -z "$Z" ] && {
-      Z=$coord
-    # elif Y is blank, must by Y (second coord)
-    } || {
-      [ -z "$Y" ] && {
-        Y=$coord
-      # else must be X (third coord)
-      } || {
-        X=$coord
-      }
-    }
-  done
-  unset IFS
-  # add current $Z, $Y, and $X to their respective linear arrays at indice $junctions
-  z[$junctions]="$Z"
-  y[$junctions]="$Y"
-  x[$junctions]="$X"
+  local -a parts=( "${(@s:,:)input_line}" )
+  x[$junctions]=${parts[1]}
+  y[$junctions]=${parts[2]}
+  z[$junctions]=${parts[3]}
 done
 unset IFS
+
+print "Parsed "$junctions" junctions"
+
+## pair calculation
+
+print "Calculating distances..."
+
+integer count_a=0
+integer edge_idx=0
+
+while (( count_a < junctions )); do
+  ((count_a++))
+  integer count_b=$count_a
+  while (( count_b < junctions )); do
+    ((count_b++))
+
+    typeset -F x1=$x[$count_a] y1=$y[$count_a] z1=$z[$count_a]
+    typeset -F x2=$x[$count_b] y2=$y[$count_b] z2=$z[$count_b]
+    typeset -F dist
+
+    ((dist = sqrt( (x2-x1)**2 + (y2-y1)**2 + (z2-z1)**2 )))
+
+    local entry=$(printf "%.4f:%d:%d" $dist $count_a $count_b)
+
+    # Explicit Indexing
+    ((edge_idx++))
+    all_edges[$edge_idx]=$entry
+  done
+done
+
+print "Generated $edge_idx pairs. Sorting..."
+
+# force IFS to default to ensure sort doesn't merge lines
+IFS=$' \t\n'
+all_edges=( "${(@n)all_edges}" )
 
 ## main
 
-count_a=0
-# iterate over input by newline once more
-IFS=$'\n'
-for input_line in $=dayeight_input; do
-  # increase count_a by 1, unset oldroot, set count_b to count_a
-  ((count_a++))
-  unset oldroot
-  count_b=0
-  while true; do
-    # increase count_b by 1, and break if exceeds total junctions
-    ((count_b++))
-    # cant check distance against self - increase count by 1 again
-    [ "$count_a" = "$count_b" ] && {
-      ((count_b++))
-    }
-    ((count_b>junctions)) && {
-      break
-    }
-    # extract z1, y1, x1, z2, y2, and x2 from linear arrays using count_a and count_b
-    z1=$z[$count_a]; y1=$y[$count_a]; x1=$x[$count_a]
-    z2=$z[$count_b]; y2=$y[$count_b]; x2=$x[$count_b]
-    # calculate distance
-    # x2-x1 squared
-    x_res=$(((x2-x1)*(x2-x1)))
-    # y2-y1 squared
-    y_res=$(((y2-y1)*(y2-y1)))
-    # z2-z1 squared
-    z_res=$(((z2-z1)*(z2-z1)))
-    # add results of above together into variable to_root
-    to_root=$((x_res+y_res+z_res))
-    # set root to square root of to_root
-    ((root=sqrt(to_root)))
-    # if oldroot not empty, this is not first loop
-    ! [ -z "$oldroot" ] && {
-      # if root is smaller than oldroot, it becomes new oldroot.
-      ((root<oldroot)) && {
-        oldroot="$root"
-        # record count_b corresponding to current smallest
-        closest="$count_b"
-      }
-    # else must be first loop, so oldroot and closest = current root and count_b
-    } || {
-      oldroot="$root"
-      closest="$count_b"
-    }
-  done
-  # reconstruct key of closest junction
-  clos_key=""$z[$closest]","$y[$closest]","$x[$closest]""
-  # save calculated distance + key of closest junction to distances, corresponding to current junction
-  distances[$input_line]=""$oldroot" "$clos_key""
-done
-unset IFS
+print "Beginning circuit wiring phase..."
 
-# print distances recorded
-distance_keys=$distances[(I)*,*,*]
-IFS=$' '
-for key in ${(@on)=distance_keys}; do
-  print $distances[$key]
+integer i
+for ((i=1; i<=junctions; i++)); do
+  parent[i]=$i
+  size[i]=1
 done
-unset IFS
+
+integer max_connections=1000
+((junctions < 50)) && {
+  print "Small input detected. Limiting to 10 connections."
+  max_connections=10
+}
+((max_connections > ${#all_edges})) && max_connections=${#all_edges}
+
+# C-style iteration
+for ((k=1; k<=max_connections; k++)); do
+
+  # fetch edge by explicit index
+  local edge=${all_edges[k]}
+
+  # extract V (everything after last colon)
+  integer v=${edge##*:}
+
+  # trim V from string
+  local temp=${edge%:*}
+
+  # extract U (everything after new last colon)
+  integer u=${temp##*:}
+
+  # union-find logic
+  integer root_u=$u
+  while ((parent[root_u] != root_u)); do
+    root_u=$parent[root_u]
+  done
+  integer curr=$u
+  while ((curr != root_u)); do
+    integer next=$parent[curr]
+    parent[curr]=$root_u
+    curr=$next
+  done
+
+  integer root_v=$v
+  while ((parent[root_v] != root_v)); do
+    root_v=$parent[root_v]
+  done
+  curr=$v
+  while ((curr != root_v)); do
+    integer next=$parent[curr]
+    parent[curr]=$root_v
+    curr=$next
+  done
+
+  ((root_u != root_v)) && {
+    ((size[root_u] < size[root_v])) && {
+      parent[root_u]=$root_v
+      ((size[root_v] += size[root_u]))
+    } || {
+      parent[root_v]=$root_u
+      ((size[root_u] += size[root_v]))
+    }
+  }
+done
+
+print "Wiring complete."
+
+## results
+
+declare -a final_tally
+for ((i=1; i <= junctions; i++)); do
+  ((parent[i] == i)) && {
+    final_tally+=${size[i]}
+  }
+done
+
+final_tally=( "${(@On)final_tally}" )
+
+print "Largest circuits: ${final_tally[1]}, ${final_tally[2]}, ${final_tally[3]}"
+
+integer val1=${final_tally[1]:-1}
+integer val2=${final_tally[2]:-1}
+integer val3=${final_tally[3]:-1}
+
+integer result=$((val1 * val2 * val3))
+print "Result: $result"
