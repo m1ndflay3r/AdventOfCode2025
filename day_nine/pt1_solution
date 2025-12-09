@@ -1,1 +1,34 @@
 #!/usr/bin/env zsh
+
+## env setup
+
+# fetch input, err if not found
+daynine_input=$(<input) || {
+  print "Error: could not find \'input\'"
+  return 1
+}
+
+# associative array for grid storage
+declare -A daynine_grid
+
+## parsing steps
+
+# move input into associative array
+y_count=0
+IFS=$'\n'
+for line in $=daynine_input; do
+  x_count=0
+  ((y_count++))
+  while true; do
+    working=${line : :1}
+    line=${line:1}
+    [ -z "$working" ] && {
+      break
+    }
+    ((x_count++))
+    
+  done
+done
+unset IFS
+
+
