@@ -107,7 +107,7 @@ for input_line in $=dayeight_input; do
     }
   done
   # reconstruct key of closest junction
-  clos_key=""$z[$closest]","$y[$closest]","$z[$closest]""
+  clos_key=""$z[$closest]","$y[$closest]","$x[$closest]""
   # save calculated distance + key of closest junction to distances, corresponding to current junction
   distances[$input_line]=""$oldroot" "$clos_key""
 done
