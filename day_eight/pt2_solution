@@ -1,0 +1,141 @@
+#!/usr/bin/env zsh
+
+## env setup
+
+zmodload zsh/mathfunc
+
+dayeight_input=$(<input) || {
+  print "Error: could not find \'input\'"
+  return 1
+}
+
+declare -a x y z parent size all_edges
+integer junctions=0
+
+## parse steps
+
+print "Parsing input..."
+
+IFS=$'\n'
+for input_line in $=dayeight_input; do
+  ((junctions++))
+  local -a parts=( "${(@s:,:)input_line}" )
+  x[$junctions]=${parts[1]}
+  y[$junctions]=${parts[2]}
+  z[$junctions]=${parts[3]}
+done
+unset IFS
+
+print "Parsed $junctions junctions."
+
+## pair calculation
+
+print "Calculating distances..."
+
+integer count_a=0
+integer edge_idx=0
+
+while ((count_a < junctions)); do
+  ((count_a++))
+  integer count_b=$count_a
+  while ((count_b < junctions)); do
+    ((count_b++))
+
+    typeset -F x1=$x[$count_a] y1=$y[$count_a] z1=$z[$count_a]
+    typeset -F x2=$x[$count_b] y2=$y[$count_b] z2=$z[$count_b]
+    typeset -F dist
+
+    ((dist = sqrt( (x2-x1)**2 + (y2-y1)**2 + (z2-z1)**2 )))
+
+    local entry=$(printf "%.4f:%d:%d" $dist $count_a $count_b)
+
+    # explicit indexing
+    ((edge_idx++))
+    all_edges[$edge_idx]=$entry
+  done
+done
+
+print "Generated $edge_idx pairs. Sorting..."
+
+# force IFS to default to ensure sort doesn't merge lines
+IFS=$' \t\n'
+all_edges=( "${(@n)all_edges}" )
+
+## main
+
+print "Beginning single-circuit wiring phase..."
+
+# initialize DSU
+integer i
+for ((i=1; i <= junctions; i++)); do
+  parent[i]=$i
+  size[i]=1
+done
+
+# track how many separate groups exist
+integer sets_remaining=$junctions
+integer limit=${#all_edges}
+
+# iterate through sorted list until job is done
+for ((k=1; k <= limit; k++)); do
+
+  # grab the edge
+  local edge=${all_edges[k]}
+
+  # extract V (everything after last colon)
+  integer v=${edge##*:}
+
+  # trim V from string
+  local temp=${edge%:*}
+
+  # extract U (everything after new last colon)
+  integer u=${temp##*:}
+
+  # union-find logic
+  integer root_u=$u
+  while ((parent[root_u] != root_u)); do
+    root_u=$parent[root_u]
+  done
+  integer curr=$u
+  while ((curr != root_u)); do
+    integer next=$parent[curr]
+    parent[curr]=$root_u
+    curr=$next
+  done
+
+  integer root_v=$v
+  while ((parent[root_v] != root_v)); do
+    root_v=$parent[root_v]
+  done
+  curr=$v
+  while ((curr != root_v)); do
+    integer next=$parent[curr]
+    parent[curr]=$root_v
+    curr=$next
+  done
+
+  # check connection
+  ((root_u != root_v)) && {
+    # merge smaller into larger
+    ((size[root_u] < size[root_v])) && {
+      parent[root_u]=$root_v
+      ((size[root_v] += size[root_u]))
+    } || {
+      parent[root_v]=$root_u
+      ((size[root_u] += size[root_v]))
+    }
+
+    # we just merged two sets, so total count drops by 1
+    ((sets_remaining--))
+
+    # if we are down to 1 set, all junctions are connected
+    ((sets_remaining == 1)) && {
+      print "All junctions connected into single circuit"
+      print "Last connection: junction $u <--> junction $v"
+      print "X coordinates: ${x[u]} and ${x[v]}"
+      integer result=$((x[u] * x[v]))
+      print "Result: "$result""
+      break
+    }
+  }
+done
