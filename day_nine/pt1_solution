@@ -8,27 +8,129 @@ daynine_input=$(<input) || {
   return 1
 }
 
+# swap hash for another char (ease of parsing)
+daynine_input=${daynine_input//'#'/'K'}
+
+# load zsh/mathfunc module for sqrt
+zmodload zsh/mathfunc
+
 # associative array for grid storage
 declare -A daynine_grid
+
+# associative array for distance storage
+declare -A distances
+
+# associative array for key of furthest corner
+declare -A far_corners
+
+# alias integer to int for brevity
+alias int="integer"
 
 ## parsing steps
 
 # move input into associative array
-y_count=0
+int y_count=0
 IFS=$'\n'
 for line in $=daynine_input; do
-  x_count=0
+  int x_count=0
   ((y_count++))
   while true; do
-    working=${line : :1}
+    working=${line: :1}
     line=${line:1}
     [ -z "$working" ] && {
       break
     }
     ((x_count++))
-    
+    daynine_grid[$x_count,$y_count]=$working
   done
 done
 unset IFS
+
+## helper functions
+
+# search grid by char
+search_grid() {
+  [ -z "$search_char" ] && {
+    search_char="$1"
+  }
+  dg_keys=$daynine_grid[(I)*,*]
+  IFS=$' '
+  for key in ${(@on)=dg_keys}; do
+    [ "$daynine_grid[$key]" = "$search_char" ] && {
+      print $key
+    }
+  done
+  unset IFS
+}
+
+# extract y coord only from key
+print_y() {
+  [ -z "$key" ] && {
+    key="$1"
+  }
+  firstloop=0
+  IFS=$','
+  for coord in $=key; do
+    [ "$firstloop" = 1 ] && {
+      print $coord
+    }
+    firstloop=1
+  done
+  unset IFS
+}
+
+# extract x coord only from key
+print_x() {
+  [ -z "$key" ] && {
+    key="$1"
+  }
+  firstloop=0
+  IFS=$','
+  for coord in $=key; do
+    [ "$firstloop" = 0 ] && {
+      print $coord
+    }
+    firstloop=1
+  done
+  unset IFS
+}
+
+# calculate distance between any two corners
+gib_dist() {
+  [ -z "$key1" ] && {
+    key1="$1"
+  }
+  [ -z "$key2" ] && {
+    key2="$2"
+  }
+  int y1=$(print_y "$key1")
+  int x1=$(print_x "$key1")
+  int y2=$(print_y "$key2")
+  int x2=$(print_x "$key2")
+  ((dist=sqrt(((y2-y1)*(y2-y1))+((x2-x1)*(x2-x1)))))
+  print $(int "$dist")
+}
+
+# calculate corner furthest from a given key
+gib_big_dist() {
+  # acquire positions of all potential corners
+  corners=$(search_grid 'K')
+  oldfurthest=0
+  furthest=0
+  current_furthest=''
+  # iterate over corners
+  IFS=$'\n'
+  for corner in $=corners; do
+    IFS=$'\n'
+    for corner2 in $=corners; do
+      
+    done
+    unset IFS
+  done
+  unset IFS
+}
+
+## main
+
 
 
