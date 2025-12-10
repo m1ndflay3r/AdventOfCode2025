@@ -2,157 +2,53 @@
 
 ## env setup
 
-# fetch input, err if not found
-[ -f input ] || {
-  print "Error: could not find \'input\'"
+# read input into array, err if not found
+[ ! -f input ] && {
+  print "Error: \'input\' not found."
   return 1
 }
+typeset -a raw_lines
+raw_lines=( ${(f)"$(<input)"} )
 
-daynine_raw=$(./make_grid)
-mv input .input
-print $daynine_raw > input
-daynine_input=$(<input)
+## parse steps
 
-# swap hash for another char (ease of parsing)
-daynine_input=${daynine_input//'#'/'K'}
+typeset -a X Y
+integer i=0
 
-# load zsh/mathfunc module for sqrt
-zmodload zsh/mathfunc
-
-# associative array for grid storage
-declare -A daynine_grid
-
-# associative array for distance storage
-declare -A distances
-
-# associative array for key of furthest corner
-declare -A far_corners
-
-## parsing steps
-
-# move input into associative array
-y_count=0
-IFS=$'\n'
-for line in $=daynine_input; do
-  x_count=0
-  ((y_count++))
-  while true; do
-    working=${line: :1}
-    line=${line:1}
-    [ -z "$working" ] && {
-      break
-    }
-    ((x_count++))
-    daynine_grid[$x_count,$y_count]=$working
-  done
+for line in $raw_lines; do
+  # skip empty lines if present
+  [[ -z "$line" ]] && continue
+  ((i++))
+  # separate coord into x and y
+  X[i]=${line%,*}
+  Y[i]=${line#*,}
 done
-unset IFS
-
-## helper functions
-
-# search grid by char
-search_grid() {
-  [ -z "$search_char" ] && {
-    search_char="$1"
-  }
-  dg_keys=$daynine_grid[(I)*,*]
-  IFS=$' '
-  for search_key in ${(@on)=dg_keys}; do
-    [ "$daynine_grid[$search_key]" = "$search_char" ] && {
-      print $search_key
-    }
-  done
-  unset IFS
-}
-
-# extract y coord only from key
-print_y() {
-  [ -z "$key" ] && {
-    y_key="$1"
-  }
-  firstloop=0
-  IFS=$','
-  for coord in $=y_key; do
-    [ "$firstloop" = 1 ] && {
-      print $coord
-    }
-    firstloop=1
-  done
-  unset IFS
-}
-
-# extract x coord only from key
-print_x() {
-  [ -z "$key" ] && {
-    x_key="$1"
-  }
-  firstloop=0
-  IFS=$','
-  for coord in $=x_key; do
-    [ "$firstloop" = 0 ] && {
-      print $coord
-    }
-    firstloop=1
-  done
-  unset IFS
-}
-
-# calculate distance between any two corners
-gib_dist() {
-  [ -z "$key1" ] && {
-    key1="$1"
-  }
-  [ -z "$key2" ] && {
-    key2="$2"
-  }
-  y1=$(print_y "$key1")
-  x1=$(print_x "$key1")
-  y2=$(print_y "$key2")
-  x2=$(print_x "$key2")
-#  integer dist
-#  dist=$((sqrt(((y2-y1)*(y2-y1))+((x2-x1)*(x2-x1)))))
-
-  # this is less accurate, but more useful, than the above
-  ((x2>x1)) && {
-    x_dist=$((x2-x1))
-  } || {
-    x_dist=$((x1-x2))
-  }
-  ((y2>y1)) && {
-    y_dist=$((y2-y1))
-  } || {
-    y_dist=$((y1-y2))
-  }
-  dist=$((x_dist+y_dist))
-  print $dist
-}
 
 ## main
 
-corners=$(search_grid 'K')
-IFS=$'\n'
-for i in $=corners; do
-  furthest_corn=''
-  longest_dist="0"
-  for j in $=corners; do
-    skippy=1
-    [ "$far_corners[$j]" != "$i" ] && {
-      distance=$(key2="$i" key1="$j" gib_dist)
-      ((distance>longest_dist)) && {
-        longest_dist="$distance"
-        furthest_corn="$j"
-      }
-      skippy=0
-    }
+integer count=$#X
+integer max_area=0
+integer idx_a idx_b
+integer w h area
+integer xa ya xb yb
+
+print "Processing $count coordinates..."
+
+for ((idx_a=1; idx_a<count; idx_a++)); do
+  xa=$X[idx_a]
+  ya=$Y[idx_a]
+
+  # inner loop starts at idx_a + 1 so we dont double-process any pairs
+  for ((idx_b=idx_a+1; idx_b<=count; idx_b++)); do
+    xb=$X[idx_b]
+    yb=$Y[idx_b]
+    # calculate absolute difference + 1 for tiles
+    ((w = (xa > xb ? xa - xb : xb - xa) + 1))
+    ((h = (ya > yb ? ya - yb : yb - ya) + 1))
+    ((area = w * h))
+    # update max_area if current is larger
+    ((area>max_area)) && max_area=$area
   done
-  [ "$skippy" = 0 ] && {
-    distances[$i]="$longest_dist"
-    far_corners[$i]="$furthest_corn"
-  }
 done
 
-key1=$furthest_corn key2=$far_corners[$furthest_corn] gib_dist &> /dev/null
-
-print $(((x_dist+1)*(y_dist+1)))
-rm input
-mv .input input
+print "Largest area: $max_area"
