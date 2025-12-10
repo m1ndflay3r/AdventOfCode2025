@@ -52,9 +52,9 @@ search_grid() {
   }
   dg_keys=$daynine_grid[(I)*,*]
   IFS=$' '
-  for key in ${(@on)=dg_keys}; do
-    [ "$daynine_grid[$key]" = "$search_char" ] && {
-      print $key
+  for search_key in ${(@on)=dg_keys}; do
+    [ "$daynine_grid[$search_key]" = "$search_char" ] && {
+      print $search_key
     }
   done
   unset IFS
@@ -63,11 +63,11 @@ search_grid() {
 # extract y coord only from key
 print_y() {
   [ -z "$key" ] && {
-    key="$1"
+    y_key="$1"
   }
   firstloop=0
   IFS=$','
-  for coord in $=key; do
+  for coord in $=y_key; do
     [ "$firstloop" = 1 ] && {
       print $coord
     }
@@ -79,11 +79,11 @@ print_y() {
 # extract x coord only from key
 print_x() {
   [ -z "$key" ] && {
-    key="$1"
+    x_key="$1"
   }
   firstloop=0
   IFS=$','
-  for coord in $=key; do
+  for coord in $=x_key; do
     [ "$firstloop" = 0 ] && {
       print $coord
     }
@@ -109,60 +109,13 @@ gib_dist() {
   print $dist
 }
 
-# calculate corner furthest from a given key
-gib_big_dist() {
-  # fetch key to check
-  [ -z "$key" ] && {
-    key=$1
-  }
-  # acquire all possible corners
-  corners=$(search_grid 'K')
-  # initialize furthest and currentfurthest
-  furthest=0
-  currentfurthest=''
-  # iterate over corners by newline
-  IFS=$'\n'
-  for corner in $=corners; do
-    # skip if $key and $corner are the same
-    [ "$key" != "$corner" ] && {
-      # get distance between $corner and $key
-      distance=$(key1=$key key2=$corner gib_dist)
-      # if distance is bigger than current furthest, then is new furthest
-      ((distance>furthest)) && {
-        furthest="$distance"
-        # currentfurthest records key of furthest corner thus far
-        currentfurthest="$corner"
-      }
-    }
-  done
-  unset IFS
-  # set associative arrays according to results for easy querying
-  distances[$key]="$furthest"
-  far_corners[$key]="$currentfurthest"
-}
-
 ## main
 
-# distance calculations
-
-# acquire position of all possible corners
-all_corners=$(search_grid 'K')
-furthest='0'
-furthest_corner=''
-# iterate over corners line by line
+corners=$(search_grid 'K')
 IFS=$'\n'
-for chk_corner in $=all_corners; do
-  # run gib_big_dist on every corner to acquire needed data
-  gib_big_dist "$chk_corner"
-  # if distance is greater than current furthest, it becomes new furthest
-  ((distances[chk_corner]>furthest)) && {
-    furthest="$distances[$chk_corner]"
-    # we only need to record one corner since we can find the other with $far_corners[$furthest_corner]
-    furthest_corner="$chk_corner"
-  }
+for i in $=corners; do
+  for j in $=corners; do
+    key2="$i" key1="$j" gib_dist
+  done
 done
 unset IFS
-
-print "Furthest distance between two corners: "$furthest""
-print "Corner 1: "$furthest_corner""
-print "Corner 2: "$far_corners[$furthest_corner]""
