@@ -140,20 +140,20 @@ for i in $=corners; do
   far_corners[$i]="$furthest_corn"
 done
 
-print "keys + distances:"
-for i in $=corners; do
-  print -n ""$distances[$i]" "
-  print -n ""$i" "
-  print $far_corners[$i]
-done
-unset IFS
+#print "keys + distances:"
+#for i in $=corners; do
+#  print -n ""$distances[$i]" "
+#  print -n ""$i" "
+#  print $far_corners[$i]
+#done
+#unset IFS
 
 
-print "furthest pair"
-print $furthest_corn
-print $far_corners[$furthest_corn]
+#print "furthest pair"
+#print $furthest_corn
+#print $far_corners[$furthest_corn]
 
-key1=$furthest_corn key2=$far_corners[$furthest_corn] gib_dist
+key1=$furthest_corn key2=$far_corners[$furthest_corn] gib_dist &> /dev/null
 
-print "surface area of pair"
-print $((x_dist*y_dist))
+#print "surface area of pair"
+print $(((x_dist+1)*(y_dist+1)))
