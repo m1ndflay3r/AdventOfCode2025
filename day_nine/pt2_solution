@@ -1,1 +1,216 @@
 #!/usr/bin/env zsh
+
+## env setup
+
+[ ! -f input ] && {
+    print "Error: \'input\' not found."
+    return 1
+}
+
+# load zsh/mathfunc for speed
+zmodload zsh/mathfunc
+
+# alias integer to int for brevity
+alias int="integer"
+
+## parsing steps
+
+print "Step 1/5: parsing input..."
+
+typeset -a X Y
+int count=0
+
+typeset -a raw_lines
+raw_lines=(${(f)"$(tr -d '\r' < input)"})
+
+typeset -a parts
+
+for line in $raw_lines; do
+  [ -z "$line" ] && continue
+  parts=(${(s:,:)line})
+  (($#parts>=2)) && {
+    ((count++))
+    X[count]=$parts[1]
+    Y[count]=$parts[2]
+  }
+done
+
+((count<4)) && {
+  print "Error: Too few points."
+  return 1
+}
+
+## data comp.
+
+print "Step 2/5: compressing coordinates..."
+
+# get unique sorted coordinates
+# (n) numeric sort, (u) unique
+typeset -a sorted_x sorted_y
+sorted_x=(${(nu)X})
+sorted_y=(${(nu)Y})
+
+int nx=$#sorted_x
+int ny=$#sorted_y
+
+# create mapping - real coord -> grid index
+# use associative arrays for O(1) lookups
+typeset -A map_x map_y
+
+for ((i=1; i<=nx; i++)); do
+  map_x[$sorted_x[i]]=$i
+done
+for ((i=1; i<=ny; i++)); do
+  map_y[$sorted_y[i]]=$i
+done
+
+## scanline
+
+print "Step 3/5: painting polygon ($((nx-1)) x $((ny-1)) grid)..."
+
+typeset -A is_inside
+
+# edges of polygon
+int e_start_x e_start_y e_end_x e_end_y
+int j k edge_idx
+typeset -a v_edges_x
+
+# iterate through each Y-band (horizontal strip between sorted_y[j] and sorted_y[j+1])
+for ((j=1; j<ny; j++)); do
+  # find Y-midpoint of band (find all vertical polygon edges that SPAN this band)
+  v_edges_x=()
+  for ((k=1; k<=count; k++)); do
+    # current vertex
+    e_start_x=$X[k]
+    e_start_y=$Y[k]
+    # next vertex (wrap around)
+    int next_k=$((k==count?1:k+1))
+    e_end_x=$X[next_k]
+    e_end_y=$Y[next_k]
+    # we only care about vertical edges (x is constant)
+    ((e_start_x==e_end_x)) && {
+      # check if edge covers current band j (from sorted_y[j] to sorted_y[j+1])
+      # edge spans min(y1,y2) to max(y1,y2)
+      int y_min=$((e_start_y<e_end_y?e_start_y:e_end_y))
+      int y_max=$((e_start_y>e_end_y?e_start_y:e_end_y))
+      # if band is strictly inside edge's Y range
+      ((y_min<=sorted_y[j]&&y_max>=sorted_y[j+1])) && {
+        v_edges_x+=($map_x[$e_start_x])
+      }
+    }
+  done
+
+  # sort vertical edges found in band by X index
+  v_edges_x=(${(n)v_edges_x})
+
+  # fill between pairs (even-odd rule)
+  # i.e., between edge 1 and 2 is inside; between 3 and 4 is inside.
+  int num_edges=$#v_edges_x
+  for ((k=1; k<num_edges; k+=2)); do
+    int x_start=$v_edges_x[k]
+    int x_end=$v_edges_x[k+1]
+    # mark all cells in row between current X columns as inside
+    for ((ix=x_start; ix<x_end; ix++)); do
+      # key = "x,y"
+      is_inside[$ix,$j]=1
+    done
+  done
+done
+
+## prefix sums
+
+print "Step 4/5: building integral image..."
+# query count of valid cells in rect
+# if count = total cells in rect, then count is valid.
+
+# 2d array S[x][y]
+typeset -A S
+
+# loop bounds
+int max_gx=$((nx-1))
+int max_gy=$((ny-1))
+
+int val current_sum
+int s_left s_top s_diag
+
+for ((y=1; y<=max_gy; y++)); do
+  for ((x=1; x<=max_gx; x++)); do
+    # value of current cell (1 if inside, 0 if outside)
+    val=${is_inside[$x,$y]:-0}
+    s_left=${S[$((x-1)),$y]:-0}
+    s_top=${S[$x,$((y-1))]:-0}
+    s_diag=${S[$((x-1)),$((y-1))]:-0}
+    ((current_sum=val+s_left+s_top-s_diag))
+    S[$x,$y]=$current_sum
+  done
+done
+
+## main
+
+print "Step 5/5: finding largest rectangle..."
+
+int max_area=0
+int idx_a idx_b
+int xa ya xb yb
+int gx1 gx2 gy1 gy2
+int grid_w grid_h
+int expected_sum actual_sum
+int w h real_area
+
+# loop over original red corners
+for ((idx_a=1; idx_a<count; idx_a++)); do
+  xa=$X[idx_a]
+  ya=$Y[idx_a]
+  gx1=$map_x[$xa]
+  gy1=$map_y[$ya]
+  for ((idx_b=idx_a+1; idx_b<=count; idx_b++)); do
+    xb=$X[idx_b]
+    yb=$Y[idx_b]
+    gx2=$map_x[$xb]
+    gy2=$map_y[$yb]
+    # normalize grid coords (min/max)
+    # grid cells are between lines
+    # if points are at indices 2 and 5, then cells are 2, 3, 4.
+    int g_xmin=$((gx1<gx2?gx1:gx2))
+    int g_xmax=$((gx1>gx2?gx1:gx2))
+    int g_ymin=$((gy1<gy2?gy1:gy2))
+    int g_ymax=$((gy1>gy2?gy1:gy2))
+    # define range of cells to check
+    # cells run from g_xmin to g_xmax-1
+    int qx1=$g_xmin
+    int qx2=$((g_xmax-1))
+    int qy1=$g_ymin
+    int qy2=$((g_ymax-1))
+    # if points are adjacent on grid (no cells between), then is valid by default (edge)
+    ((qx2<qx1||qy2<qy1)) && {
+      # still valid, calculate area
+      :
+    } || {
+      # calculate sum of valid cells (1s) in region
+      # sum(x2, y2) - sum(x1-1, y2) - sum(x2, y1-1) + sum(x1-1, y1-1)
+      int term1=${S[$qx2,$qy2]:-0}
+      int term2=${S[$((qx1-1)),$qy2]:-0}
+      int term3=${S[$qx2,$((qy1-1))]:-0}
+      int term4=${S[$((qx1-1)),$((qy1-1))]:-0}
+      ((actual_sum=term1-term2-term3+term4))
+      # fetch expected cells count
+      ((grid_w=qx2-qx1+1))
+      ((grid_h=qy2-qy1+1))
+      ((expected_sum=grid_w*grid_h))
+      # if not all cells valid (1), then rectangle contains hole || is outside
+      ((actual_sum!=expected_sum)) && {
+        continue
+      }
+    }
+    # if code reached here, then rectangle is valid - calculate real area
+    # width = abs(xa - xb) + 1
+    ((w=(xa>xb?xa-xb:xb-xa)+1))
+    ((h=(ya>yb?ya-yb:yb-ya)+1))
+    ((real_area=w*h))
+    ((real_area>max_area)) && {
+      max_area=$real_area
+    }
+  done
+done
+
+print "Answer: $max_area"
