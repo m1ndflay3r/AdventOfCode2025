@@ -3,10 +3,15 @@
 ## env setup
 
 # fetch input, err if not found
-daynine_input=$(<input) || {
+[ -f input ] || {
   print "Error: could not find \'input\'"
   return 1
 }
+
+daynine_raw=$(./make_grid)
+mv input .input
+print $daynine_raw > input
+daynine_input=$(<input)
 
 # swap hash for another char (ease of parsing)
 daynine_input=${daynine_input//'#'/'K'}
@@ -130,16 +135,24 @@ for i in $=corners; do
   furthest_corn=''
   longest_dist="0"
   for j in $=corners; do
-    distance=$(key2="$i" key1="$j" gib_dist)
-    ((distance>longest_dist)) && {
-      longest_dist="$distance"
-      furthest_corn="$j"
+    skippy=1
+    [ "$far_corners[$j]" != "$i" ] && {
+      distance=$(key2="$i" key1="$j" gib_dist)
+      ((distance>longest_dist)) && {
+        longest_dist="$distance"
+        furthest_corn="$j"
+      }
+      skippy=0
     }
   done
-  distances[$i]="$longest_dist"
-  far_corners[$i]="$furthest_corn"
+  [ "$skippy" = 0 ] && {
+    distances[$i]="$longest_dist"
+    far_corners[$i]="$furthest_corn"
+  }
 done
 
 key1=$furthest_corn key2=$far_corners[$furthest_corn] gib_dist &> /dev/null
 
 print $(((x_dist+1)*(y_dist+1)))
+rm input
+mv .input input
