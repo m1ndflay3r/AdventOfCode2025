@@ -2,6 +2,7 @@
 
 ## env setup
 
+# check if puzzle input present, error if not found
 [ ! -f input ] && {
     print "Error: \'input\' not found."
     return 1
