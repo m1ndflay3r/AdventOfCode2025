@@ -104,8 +104,21 @@ gib_dist() {
   x1=$(print_x "$key1")
   y2=$(print_y "$key2")
   x2=$(print_x "$key2")
-  integer dist
-  dist=$((sqrt(((y2-y1)*(y2-y1))+((x2-x1)*(x2-x1)))))
+#  integer dist
+#  dist=$((sqrt(((y2-y1)*(y2-y1))+((x2-x1)*(x2-x1)))))
+
+  # this is less accurate, but more useful, than the above
+  ((x2>x1)) && {
+    x_dist=$((x2-x1))
+  } || {
+    x_dist=$((x1-x2))
+  }
+  ((y2>y1)) && {
+    y_dist=$((y2-y1))
+  } || {
+    y_dist=$((y1-y2))
+  }
+  dist=$((x_dist+y_dist))
   print $dist
 }
 
@@ -114,8 +127,33 @@ gib_dist() {
 corners=$(search_grid 'K')
 IFS=$'\n'
 for i in $=corners; do
+  furthest_corn=''
+  longest_dist="0"
   for j in $=corners; do
-    key2="$i" key1="$j" gib_dist
+    distance=$(key2="$i" key1="$j" gib_dist)
+    ((distance>longest_dist)) && {
+      longest_dist="$distance"
+      furthest_corn="$j"
+    }
   done
+  distances[$i]="$longest_dist"
+  far_corners[$i]="$furthest_corn"
+done
+
+print "keys + distances:"
+for i in $=corners; do
+  print -n ""$distances[$i]" "
+  print -n ""$i" "
+  print $far_corners[$i]
 done
 unset IFS
+
+
+print "furthest pair"
+print $furthest_corn
+print $far_corners[$furthest_corn]
+
+key1=$furthest_corn key2=$far_corners[$furthest_corn] gib_dist
+
+print "surface area of pair"
+print $((x_dist*y_dist))
