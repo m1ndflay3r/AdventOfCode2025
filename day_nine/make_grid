@@ -1,0 +1,54 @@
+#!/usr/bin/env zsh
+
+# if you're wondering why this is here, it's because I mistakenly thought puzzle input was a grid, not
+# coords. Therefore, rather than change my parsing, I made this because why not?
+
+makegrid_input=$(<input) || {
+  print "Error: could not find \'input\'"
+  return 1
+}
+
+# declare associative array
+declare -A le_grid
+
+# iterate by newline
+x_largest=0
+y_largest=0
+IFS=$'\n'
+for line in $=makegrid_input; do
+  x_coord=''
+  y_coord=''
+  IFS=$','
+  for coord in $=makegrid_input; do
+    [ -z "$x_coord" ] && {
+      x_coord="$coord"
+    } || {
+      y_coord="$coord"
+    }
+  done
+  unset IFS
+  ((x_coord>x_largest)) && {
+    x_largest="$x_coord"
+  }
+  ((y_coord>y_largest)) && {
+    y_largest="$y_coord"
+  }
+done
+unset IFS
+
+y_count=0
+while true; do
+  ((y_count++))
+  ((y_count>y_largest)) && {
+    break
+  }
+  x_count=0
+  while true; do
+    ((x_count++))
+    ((x_count>x_largest)) && {
+      break
+    }
+    le_grid[$x_count,$y_count]=.
+  done
+done
+
