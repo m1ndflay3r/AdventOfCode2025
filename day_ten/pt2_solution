@@ -1,0 +1,298 @@
+#!/usr/bin/env zsh
+
+## env setup
+
+# check for puzzle input, err if not found
+[ -f input ] || {
+  print "Error: \'input\' not found"
+  return 1
+}
+
+# read input into linear array
+declare -a lines
+lines=("${(@f)$(<input)}")
+
+# load needed math functions
+zmodload zsh/mathfunc
+
+# alias integer to int for brevity
+alias int="integer"
+
+# initialize result variable (int)
+int result
+
+## helper functions
+
+# recursive search function
+recursive_search() {
+  local depth=$1
+  local current_cost=$2
+  # if already exceeded current lowest press count, theres no need to go further
+  ((current_cost >= min_global_presses)) && {
+    return 0
+  }
+  # base case - assign all free variables
+  ((depth > num_free_vars_global)) && {
+    local valid=1
+    local pivot_cost=0.0
+    local c r idx idx2 val f f_idx f_assigned coeff rounded_val diff
+    # check all pivot cols
+    for ((c=1; c<=num_buttons_global; c++)); do
+      [[ -n ${pivot_map_global[$c]:-} ]] && {
+        r=${pivot_map_global[$c]}
+        # begin with RHS
+        idx=$(((r-1)*cols_global+cols_global))
+        val=${matrix_global[$idx]}
+        # subtract free variables
+        for ((f=1; f<=num_free_vars_global; f++)); do
+          f_idx=${free_vars_global[$f]}
+          f_assigned=${free_assignments_global[$f]}
+          idx2=$(((r-1)*cols_global+f_idx))
+          coeff=${matrix_global[$idx2]}
+          val=$((val-(coeff*f_assigned)))
+        done
+        # validity check
+        ((val < -0.01)) && {
+          valid=0
+          break
+        }
+        rounded_val=$((floor(val+0.5)))
+        diff=$((val-rounded_val))
+        ((diff < 0)) && {
+          diff=$((-diff))
+        }
+        ((diff > 0.01)) && {
+          valid=0
+          break
+        }
+        ((pivot_cost+=rounded_val))
+      }
+    done
+    ((valid == 1)) && {
+      local total=$((current_cost+pivot_cost))
+      ((total < min_global_presses)) && {
+        min_global_presses=$total
+        solution_found_global=1
+      }
+    }
+    return
+  }
+  # recursion
+  local limit=${free_limits_global[$depth]}
+  local v
+  # heuristic (try small values first)
+  for ((v=0; v<=limit; v++)); do
+    free_assignments_global[$depth]=$v
+    recursive_search $((depth+1)) $((current_cost+v))
+  done
+}
+
+# core solver function
+solve_attempt() {
+  # function-specific arrays
+  declare -a target raw_buttons indices
+  declare -F val max_val abs_val tmp pivot_val factor epsilon=0.000001
+  declare -F rhs coeff max_f
+  # function-specific vars
+  int i j k b r c idx idx1 idx2 mat_idx p_idx
+  int num_counters num_buttons cols total_cells
+  int pivot_row sel_row
+  # fetch working
+  local target_str="$1"
+  local buttons_str="$2"
+  # fetch shuffled order array
+  declare -a button_order=("${(@P)3}")
+  ## 1 - parse
+  target_str=${target_str//[\{\}]/}
+  target=(${(s:,:)target_str})
+  num_counters=$#target
+  raw_buttons=(${(s:):)buttons_str})
+  num_buttons=$#raw_buttons
+  cols=$((num_buttons+1))
+  total_cells=$((num_counters*cols))
+  declare -g -a matrix_global
+  for ((i=1; i <= total_cells; i++)); do
+    matrix_global[i]=0.0
+  done
+  # fill matrix with shuffled col order
+  # (algorithm doesnt care about order - but basis selection very much does)
+  for ((b=1; b<=num_buttons; b++)); do
+    # use shuffled index to select column 'b' button
+    int actual_btn_idx=${button_order[b]}
+    local b_data=${raw_buttons[actual_btn_idx]//[\( ]/}
+    indices=( ${(s:,:)b_data} )
+    for idx in $indices; do
+      int row=$((idx+1))
+      mat_idx=$(((row-1)*cols+b))
+      matrix_global[mat_idx]=1.0
+    done
+  done
+  for ((r=1; r<=num_counters; r++)); do
+    mat_idx=$(((r-1)*cols+cols))
+    matrix_global[mat_idx]=$((target[r]*1.0))
+  done
+  ## 2 - gaussian elimination
+  pivot_row=1
+  declare -g -A pivot_map_global
+  declare -g -a free_vars_global
+  pivot_map_global=()
+  free_vars_global=()
+  for ((c=1; c<=num_buttons && pivot_row<=num_counters; c++)); do
+    sel_row=-1
+    max_val=0.0
+    for ((k=pivot_row; k<=num_counters; k++)); do
+      idx=$(((k-1)*cols+c))
+      val=${matrix_global[$idx]}
+      ((val < 0)) && {
+        abs_val=$((-val))
+      } || {
+        abs_val=$val
+      }
+      ((abs_val > max_val)) && {
+        max_val=$abs_val
+        sel_row=$k
+      }
+    done
+    ((max_val < epsilon)) && {
+      continue
+    }
+    ((sel_row != pivot_row)) && {
+      for ((j=1; j<=cols; j++)); do
+        idx1=$(((pivot_row-1)*cols+j))
+        idx2=$(((sel_row-1)*cols+j))
+        tmp=${matrix_global[$idx1]}
+        matrix_global[$idx1]=${matrix_global[$idx2]}
+        matrix_global[$idx2]=$tmp
+      done
+    }
+    idx=$(((pivot_row-1)*cols+c))
+    pivot_val=${matrix_global[$idx]}
+    for ((j=c; j<=cols; j++)); do
+      idx1=$(((pivot_row-1)*cols+j))
+      matrix_global[$idx1]=$((matrix_global[$idx1] / pivot_val))
+    done
+    for ((k=1; k<=num_counters; k++)); do
+      ((k == pivot_row)) && {
+        continue
+      }
+      p_idx=$(((k-1)*cols + c))
+      factor=${matrix_global[$p_idx]}
+      ((factor < -epsilon || factor > epsilon)) && {
+        for ((j=c; j<=cols; j++)); do
+          idx1=$(((k-1)*cols+j))
+          idx2=$(((pivot_row-1)*cols+j))
+          matrix_global[$idx1]=$((matrix_global[$idx1] - (factor * matrix_global[$idx2])))
+        done
+      }
+    done
+    pivot_map_global[$c]=$pivot_row
+    ((pivot_row++))
+  done
+  for ((c=1; c<=num_buttons; c++)); do
+    [[ -z ${pivot_map_global[$c]:-} ]] && {
+      free_vars_global+=($c)
+    }
+  done
+  ## 3 - recursion setup
+  declare -g -A free_limits_global
+  declare -g -a free_assignments_global
+  declare -g -F min_global_presses=9999999999.0
+  declare -g -i solution_found_global=0
+  declare -g -i num_free_vars_global=$#free_vars_global
+  declare -g -i num_buttons_global=$num_buttons
+  declare -g -i cols_global=$cols
+  int f_idx limit_int
+  for ((i=1; i<=num_free_vars_global; i++)); do
+    f_idx=${free_vars_global[$i]}
+    limit_int=1000000
+    for ((c=1; c<=num_buttons; c++)); do
+       [[ -n ${pivot_map_global[$c]:-} ]] && {
+         r=${pivot_map_global[$c]}
+         idx=$(((r-1)*cols+cols))
+         rhs=${matrix_global[$idx]}
+         idx2=$(((r-1)*cols+f_idx))
+         coeff=${matrix_global[$idx2]}
+         ((coeff > epsilon)) && {
+           max_f=$((rhs/coeff))
+           ((max_f < limit_int)) && {
+             limit_int=$((floor(max_f)))
+           }
+         }
+       }
+    done
+    ((limit_int < 0)) && {
+      limit_int=0
+    }
+    free_limits_global[$i]=$limit_int
+  done
+  recursive_search 1 0
+  ((solution_found_global == 1)) && {
+    printf "%.0f" $min_global_presses
+  } || {
+    print "0"
+  }
+}
+
+# shuffler function
+solve_machine() {
+  local target="$1"
+  local buttons="$2"
+  # parse button count first to set up shuffle indices
+  local tmp_arr
+  tmp_arr=(${(s:):)buttons})
+  int n_btns=$#tmp_arr
+  declare -a base_order
+  for ((i=1; i<=n_btns; i++)); do
+    base_order[i]=$i
+  done
+  int best_res=0
+  int current_res=0
+  # try >= 50 random permutations (brute force)
+  # this is more than fast enough for AoC
+  for ((attempt=1; attempt<=50; attempt++)); do
+    # shuffle base_order
+    declare -a shuffled_order
+    shuffled_order=($base_order)
+    # Fisher-Yates shuffle
+    int j temp
+    for ((i=n_btns; i>0; i--)); do
+       j=$((RANDOM%i+1))
+       # swap i and j
+       temp=$shuffled_order[i]
+       shuffled_order[i]=$shuffled_order[j]
+       shuffled_order[j]=$temp
+    done
+    # pass name of array 'shuffled_order'
+    current_res=$(solve_attempt "$target" "$buttons" "shuffled_order")
+    ((current_res > 0)) && {
+      # valid solution found
+      ((best_res == 0 || current_res < best_res)) && {
+        best_res=$current_res
+      }
+    }
+  done
+  print $best_res
+}
+
+## main
+
+print "Processing ${#lines} machines..."
+
+for line in $lines; do
+  [ -z "$line" ] && {
+    continue
+  }
+  local btn_chunk=${line#*\]}
+  btn_chunk=${btn_chunk%%\{*}
+  btn_chunk=${btn_chunk## }
+  btn_chunk=${btn_chunk%% }
+  local target_chunk="{${line#*\{}"
+  min_presses=$(solve_machine "$target_chunk" "$btn_chunk")
+  [[ "$min_presses" =~ ^[0-9]+$ ]] && {
+    ((min_presses>0)) && {
+      ((result+=min_presses))
+    }
+  }
+done
+
+print "Total minimum presses: $result"
