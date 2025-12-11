@@ -52,7 +52,7 @@ solve_machine() {
   # split on closing ')'
   raw_buttons=(${(s:):)buttons_str})
   num_buttons=$#raw_buttons
-  ## 4 - build grid
+  ## 4 - build matrix
   cols=$((num_buttons+1))
   total_cells=$((num_lights*cols))
   # initialize 0 (1-based index)
