@@ -1,1 +1,208 @@
 #!/usr/bin/env zsh
+
+## env setup
+
+# error if puzzle input not found
+[ -f input ] || {
+  print "Error: could not find \'input\'"
+  return 1
+}
+
+# alias integer to int for brevity
+alias int="integer"
+
+# initialize result var
+int result=0
+
+# declare linear array for input
+declare -a lines
+
+# read input into linear array
+lines=("${(@f)$(<input)}")
+
+# env sanitation
+emulate -L zsh
+
+## helper functions
+
+# solver function
+solve_machine() {
+  ## 1 - hoist all declarations (silence & speed)
+  # we declare these once at the top to prevent loop-assignment noise
+  declare -a target raw_buttons matrix indices free_vars
+  declare -A pivot_map sol
+  int i j k b r c m f idx idx1 idx2 mat_idx p_idx
+  int t_len num_lights num_buttons cols total_cells
+  int pivot_row sel_row tmp val
+  int min_presses num_free limit current_presses bit
+  local target_str="$1"
+  local buttons_str="$2"
+  local b_data
+  ## 2 - parsing of lights
+  t_len=${#target_str}
+  num_lights=$t_len
+  for ((i=1; i<=t_len; i++)); do
+    [[ "${target_str[i]}" = "#" ]] && {
+      target[i]=1
+    } || {
+      target[i]=0
+    }
+  done
+  ## 3 - button parsing
+  # split on closing ')'
+  raw_buttons=(${(s:):)buttons_str})
+  num_buttons=$#raw_buttons
+  ## 4 - build grid
+  cols=$((num_buttons+1))
+  total_cells=$((num_lights*cols))
+  # initialize 0 (1-based index)
+  for ((i=1; i<=total_cells; i++)); do
+    matrix[i]=0
+  done
+  # fill matrix columns (buttons)
+  for ((b=1; b<=num_buttons; b++)); do
+    # clean string: remove '(' and spaces
+    b_data=${raw_buttons[b]//[\( ]/}
+    # assignment to pre-declared array (silent)
+    indices=(${(s:,:)b_data})
+    for idx in $indices; do
+      # light index 0->row 1
+      int row=$((idx+1))
+      mat_idx=$(((row-1)*cols+b))
+      matrix[mat_idx]=1
+    done
+  done
+  # fill augmented column (target)
+  for ((r=1; r<=num_lights; r++)); do
+    mat_idx=$(((r-1)*cols+cols))
+    matrix[mat_idx]=$target[r]
+  done
+  ## 5 - gaussian elimination
+  pivot_row=1
+  # reset helper arrays for this run
+  pivot_map=()
+  free_vars=()
+  for ((c=1; c<=num_buttons && pivot_row<=num_lights; c++)); do
+    # find pivot
+    sel_row=-1
+    for ((k=pivot_row; k<=num_lights; k++)); do
+      idx=$(((k-1)*cols+c))
+      ((matrix[idx] == 1)) && {
+        sel_row=$k
+        break
+      }
+    done
+    ((sel_row == -1)) && {
+      free_vars+=($c)
+      continue
+    }
+    # swap
+    ((sel_row != pivot_row)) && {
+      for ((j=1; j<=cols; j++)); do
+        idx1=$(((pivot_row-1)*cols+j))
+        idx2=$(((sel_row-1)*cols+j))
+        tmp=$matrix[idx1]
+        matrix[idx1]=$matrix[idx2]
+        matrix[idx2]=$tmp
+      done
+    }
+    # eliminate
+    for ((k=1; k<=num_lights; k++)); do
+      ((k == pivot_row)) && continue
+      p_idx=$(((k-1)*cols+c))
+      ((matrix[p_idx] == 1)) && {
+        for ((j=c; j<=cols; j++)); do
+          idx1=$(((k-1)*cols+j))
+          idx2=$(((pivot_row-1)*cols+j))
+          matrix[idx1]=$((matrix[idx1]^matrix[idx2]))
+        done
+      }
+    done
+    pivot_map[$c]=$pivot_row
+    ((pivot_row++))
+  done
+  # capture remaining free variables
+  for ((c=1; c<=num_buttons; c++)); do
+    [[ -z ${pivot_map[$c]} ]] && \
+    [[ ${free_vars[(Ie)$c]} -eq 0 ]] && {
+      free_vars+=($c)
+    }
+  done
+  ## 6 - check consistency
+  for ((k=pivot_row; k<=num_lights; k++)); do
+    idx=$(((k-1)*cols+cols))
+    ((matrix[idx] == 1)) && {
+      print "impossible"
+      return
+    }
+  done
+  ## 7 - calculate min presses
+  min_presses=999999
+  num_free=$#free_vars
+  limit=$((2**num_free))
+  for ((m=0; m<limit; m++)); do
+    sol=()
+    current_presses=0
+    for ((f=1; f<=num_free; f++)); do
+      idx=$free_vars[f]
+      bit=$(((m>>(f-1))&1))
+      sol[$idx]=$bit
+      ((current_presses+=bit))
+    done
+    for ((c=num_buttons; c>=1; c--)); do
+      [[ -n ${pivot_map[$c]} ]] && {
+        r=${pivot_map[$c]}
+        idx=$(((r-1)*cols+cols))
+        val=$matrix[idx]
+        # back substitution logic
+        for ((f=1; f<=num_free; f++)); do
+          idx2=$free_vars[f]
+          # only if free var is to the right
+          ((idx2>c)) && {
+            idx1=$(((r-1)*cols+idx2))
+            ((matrix[idx1] == 1)) && {
+              val=$((val^sol[$idx2]))
+            }
+          }
+        done
+        sol[$c]=$val
+        ((current_presses+=val))
+      }
+    done
+    ((current_presses<min_presses)) && {
+      min_presses=$current_presses
+    }
+  done
+  print $min_presses
+}
+
+## main
+
+print "Processing ${#lines} machines..."
+
+for line in $lines; do
+  [ -z "$line" ] && continue
+    local target=${line#*\[}
+    target=${target%%\]*}
+    local btn_chunk=${line#*\]}
+    btn_chunk=${btn_chunk%%\{*}
+    btn_chunk=${btn_chunk## }
+    btn_chunk=${btn_chunk%% }
+    # capture result
+    minpress=''
+    minpress=$(solve_machine "$target" "$btn_chunk")
+    # validate result (must be a number)
+    [[ "$minpress" = "impossible" ]] && {
+      print "Warning: impossible machine found."
+    } || {
+      [[ "$minpress" =~ ^[0-9]+$ ]] && {
+        ((result+=minpress))
+      } || {
+        print "ERROR: malformed result received from solver:"
+        print "'$result'"
+        return 1
+      }
+    }
+done
+
+print "Minimum total presses: $result"
