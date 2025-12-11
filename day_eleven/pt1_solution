@@ -1,0 +1,52 @@
+#!/usr/bin/env zsh
+
+## env setup
+
+# check for input, err if not found
+[ -f input ] || {
+  print "Error: \'input\' not found"
+}
+
+# array declarations
+declare -a dayeleven_input outboxes
+
+# read input into linear array
+dayeleven_input=("${(@f)$(<input)}")
+
+## helper functions
+
+# query whether machine is outbox
+query_out() {
+  box="$1"
+  for outbox in $outboxes; do
+    [ "$box" = "$outbox" ] && {
+      return 0
+    }
+  done
+  return 1
+}
+
+# link machines together into chains
+create_links() {
+  for line in $dayeleven_input; do
+    # can split by char count since machine names are always 3 chars long
+    machine_name=${line: :3}
+    # trim 5 instead of 3 to remove ': ' from beginning of line remainder
+    line=${line:5}
+    ## 1 - determine out point names
+    # if line = out, we add to outboxes array
+    [ "$line" = "out" ] && {
+      outboxes+=("$machine_name")
+    }
+    ## 2 - create machine links
+    IFS=$' '
+    for link in $=line; do
+      eval $machine_name+=" $link"
+    done
+    unset IFS
+  done
+  # after above, we can now query the links of any machine via referencing its name
+}
+
+## main
+
