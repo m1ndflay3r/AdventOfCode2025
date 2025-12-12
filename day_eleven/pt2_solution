@@ -1,12 +1,109 @@
 #!/usr/bin/env zsh
 
-result=0
+## env setup
 
-./pt2_core | while read -r i; do
-  [ "$i" != 'hit' ] && {
-    print "Warn: received malformed response "$i""
+# check for puzzle input, error if not found
+[ -f input ] || {
+  print "Error: 'input' not found"
+  return 1
+}
+
+# alias integer to int for brevity
+alias int="integer"
+
+# array declarations
+declare -A memo
+declare -a dayeleven_input
+
+# variable declarations
+int result=0
+
+# read input into linear array
+dayeleven_input=("${(@f)$(<input)}")
+
+## helper functions
+
+# recursion function with caching
+# usage: count_paths machine_name visited_dac visited_fft
+count_paths() {
+  local working="$1"
+  local v_dac="$2"
+  local v_fft="$3"
+  ## 1 - check cache
+  # create unique key based on node + dac status + fft status
+  local key="${working}_${v_dac}_${v_fft}"
+  [[ -n "${memo[$key]}" ]] && {
+    result=${memo[$key]}
+    return
   }
-  ((result++))
+  ## 2 - update state
+  # use local copies so we don't mess up parent process
+  local next_dac=$v_dac
+  local next_fft=$v_fft
+  [[ "$working" = "dac" ]] && {
+    next_dac=1
+  }
+  [[ "$working" = "fft" ]] && {
+    next_fft=1
+  }
+  ## 3 - outbox detection
+  [[ "$working" = "out" ]] && {
+    ((next_dac == 1 && next_fft == 1)) && {
+        result=1
+    } || {
+        result=0
+    }
+    # cache result
+    memo[$key]=$result
+    return
+  }
+  ## 4 - recursion
+  local working_links
+  # retrieve links using nested variable name
+  working_links=$(eval print $"$working")
+  # dead end check
+  [[ -z "$working_links" ]] && {
+    memo[$key]=0
+    result=0
+    return
+  }
+  local total=0
+  local child_result=0
+  IFS=$' '
+  for i in $=working_links; do
+    # recurse synchronously
+    count_paths "$i" "$next_dac" "$next_fft"
+    # capture the result from the global result immediately
+    child_result=$result
+    # add to our local total
+    ((total += child_result))
+  done
+  unset IFS
+  ## 5 - save to cache and return
+  memo[$key]=$total
+  result=$total
+}
+
+## parsing steps
+
+for line in $dayeleven_input; do
+  ## 1 - separate machine name and links
+  # can split by char count since machine names are always 3 chars long
+  machine_name=${line: :3}
+  # trim 5 instead of 3 to remove ': ' from beginning of line remainder
+  line=${line:5}
+  ## 2 - create machine links
+  IFS=$' '
+  for link in $=line; do
+    eval "$machine_name+=' $link'"
+  done
+  unset IFS
 done
 
+## main
+
+# start recursion from svr with 0 dac and 0 fft
+count_paths svr 0 0
+
+# print result
 print $result
