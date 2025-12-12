@@ -1,0 +1,12 @@
+#!/usr/bin/env zsh
+
+result=0
+
+./pt2_core | while read -r i; do
+  [ "$i" != 'hit' ] && {
+    print "Warn: received malformed response "$i""
+  }
+  ((result++))
+done
+
+print $result
