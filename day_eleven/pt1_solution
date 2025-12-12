@@ -1,115 +1,16 @@
 #!/usr/bin/env zsh
 
-## env setup
+result=0
 
-# check for input, err if not found
-[ -f input ] || {
-  print "Error: 'input' not found"
-  exit 1
-}
+core_var=$(./pt1_core)
 
-# include zsh_libmisc, load needed library functions
-fpath=(/usr/lib/zsh_libmisc/libmisc.zwc $fpath)
-autoload query_jobs
-
-# load zsh/zselect for tiny-increment sleep
-zmodload zsh/zselect
-
-# alias integer to int for brevity
-alias int="integer"
-
-# array declarations
-declare -a dayeleven_input machines
-
-# variable declarations
-int result z_jobs
-
-# read input into linear array
-dayeleven_input=("${(@f)$(<input)}")
-
-# initialize jobs count if unset
-[ -z "$j" ] && {
-  j=$(($(nproc)+1))
-}
-
-# clear working dir if exist, and remake
-[ -d /tmp/dayeleven_working ] && {
-  rm -rf /tmp/dayeleven_working
-}
-mkdir /tmp/dayeleven_working
-
-## helper functions
-
-# recursive create_worker function
-create_worker() {
-  # fetch working machine
-  working="$1"
-  ## 1 - outbox handling
-  # if we've reached out, do not recurse further
-  [ "$working" = "out" ] && {
-    # write .outbox file for later tallying
-    ! [ -d /tmp/dayeleven_working ] && {
-      print "Warn: for some reason, dayeleven_working isn't there"
-    }
-    print '' > /tmp/dayeleven_working/"$RANDOM$RANDOM".outbox
-    return 0
+IFS=$'\n'
+for i in $=core_var; do
+  [ "$i" != 'hit' ] && {
+    print "Warn: received malformed response "$i""
   }
-  ## 2 - begin recursion (if we've reached here, we're not outbox)
-  # fetch links via nested variable print
-  working_links=$(eval print $"$working")
-  # dead end check (if node has no definitions)
-  [ -z "$working_links" ] && {
-    return 0
-  }
-  # continue recursion for every link
-  IFS=$' '
-  for i in $=working_links; do
-    [ "$(query_jobs)" -ge "$j" ] && {
-      until ! [ "$(query_jobs)" -ge "$j" ]; do
-        zselect -t 5
-      done
-    }
-    create_worker "$i" &
-  done
-  unset IFS
-  return 0
-}
-
-## parsing steps
-
-for line in $dayeleven_input; do
-  ## 1 - separate machine name and links
-  # can split by char count since machine names are always 3 chars long
-  machine_name=${line: :3}
-  # trim 5 instead of 3 to remove ': ' from beginning of line remainder
-  line=${line:5}
-  # add machine name to machines arr
-  machines+=("$machine_name")
-  ## 2 - create machine links
-  IFS=$' '
-  for link in $=line; do
-    eval "$machine_name+=' $link'"
-  done
-  unset IFS
-done
-
-## main
-
-# start create_worker recursion
-create_worker you &
-
-# until all workers complete, do nothing
-until [ -z "$(query_jobs)" ]; do
-  zselect -t 5
-done
-
-# tally outboxes
-for i in /tmp/dayeleven_working/*.outbox(N); do
   ((result++))
 done
+unset IFS
 
-# print results
-print "$result"
-
-# cleanup
-rm -rf /tmp/dayeleven_working
+print $result
