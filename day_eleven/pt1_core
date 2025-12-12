@@ -19,7 +19,7 @@ zmodload zsh/zselect
 alias int="integer"
 
 # array declarations
-declare -a dayeleven_input machines
+declare -a dayeleven_input
 
 # variable declarations
 int result z_jobs
@@ -74,8 +74,6 @@ for line in $dayeleven_input; do
   machine_name=${line: :3}
   # trim 5 instead of 3 to remove ': ' from beginning of line remainder
   line=${line:5}
-  # add machine name to machines arr
-  machines+=("$machine_name")
   ## 2 - create machine links
   IFS=$' '
   for link in $=line; do
