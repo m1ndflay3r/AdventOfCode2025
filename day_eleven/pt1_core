@@ -12,7 +12,7 @@
 fpath=(/usr/lib/zsh_libmisc/libmisc.zwc $fpath)
 autoload query_jobs
 
-# load zsh/zselect for tiny-increment sleep
+# load zselect for extra-short sleep
 zmodload zsh/zselect
 
 # alias integer to int for brevity
@@ -56,15 +56,11 @@ create_worker() {
   IFS=$' '
   for i in $=working_links; do
     [ "$(query_jobs)" -ge "$j" ] && {
-      until ! [ "$(query_jobs)" -ge "$j" ]; do
+      until [ "$(query_jobs)" -lt "$j" ]; do
         zselect -t 5
       done
     }
     create_worker "$i" &
-    # until all workers complete, do nothing
-    until [ -z "$(query_jobs)" ]; do
-      zselect -t 5
-    done
   done
   unset IFS
   return 0
@@ -92,8 +88,3 @@ done
 
 # start create_worker recursion
 create_worker you &
-
-# until all workers complete, do nothing
-until [ -z "$(query_jobs)" ]; do
-  zselect -t 5
-done

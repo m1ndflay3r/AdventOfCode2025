@@ -2,15 +2,11 @@
 
 result=0
 
-core_var=$(./pt1_core)
-
-IFS=$'\n'
-for i in $=core_var; do
+./pt1_core | while read -r i; do
   [ "$i" != 'hit' ] && {
     print "Warn: received malformed response "$i""
   }
   ((result++))
 done
-unset IFS
 
 print $result
