@@ -4,7 +4,8 @@
 
 # check for input, err if not found
 [ -f input ] || {
-  print "Error: \'input\' not found"
+  print "Error: 'input' not found"
+  exit 1
 }
 
 # include zsh_libmisc, load needed library functions
@@ -18,10 +19,10 @@ zmodload zsh/zselect
 alias int="integer"
 
 # array declarations
-declare -a dayeleven_input outboxes machines
+declare -a dayeleven_input machines
 
 # variable declarations
-int result z_jobs outbox_res you_res
+int result z_jobs
 
 # read input into linear array
 dayeleven_input=("${(@f)$(<input)}")
@@ -39,48 +40,27 @@ mkdir /tmp/dayeleven_working
 
 ## helper functions
 
-# query whether machine is outbox
-is_outbox() {
-  box="$1"
-  for outbox in $outboxes; do
-    [ "$box" = "$outbox" ] && {
-      return 0
-    }
-  done
-  return 1
-}
-
 # recursive create_worker function
 create_worker() {
   # fetch working machine
   working="$1"
-  # randomize worker id rather than increment since we're recursing
-  # this algorithm doesn't care about order anyways, at least in theory
-  worker_id="$RANDOM"
-  until ! [ -f /tmp/dayeleven_working/"$worker_id".claim ]; do
-    worker_id="$RANDOM"
-  done
-  touch /tmp/dayeleven_working/"$worker_id".claim
-  ## 1 - outbox / you handling
-  # if machine is outbox, we've completed a path.
-  is_outbox "$working" && {
-    touch /tmp/dayeleven_working/"$worker_id".outbox
+  ## 1 - outbox handling
+  # if we've reached out, do not recurse further
+  [ "$working" = "out" ] && {
+    # write .outbox file for later tallying
+    ! [ -d /tmp/dayeleven_working ] && {
+      print "Warn: for some reason, dayeleven_working isn't there"
+    }
+    print '' > /tmp/dayeleven_working/"$RANDOM$RANDOM".outbox
     return 0
   }
-  # if machine is you, we must end here or we'll infinitely loop.
-  # instead, increment "you counter" to determine multiplication result
-  [ "$working" = 'you' ] && {
-    touch /tmp/dayeleven_working/"$worker_id".you
-    # don't stop here if this is our first loop through
-    ! [ -f /tmp/dayeleven_working/firstloop ] && {
-      rm -rf /tmp/dayeleven_working/firstloop
-    } || {
-      return 0
-    }
-  }
-  ## 2 - begin recursion (if we've reached here, we're not outbox nor you)
+  ## 2 - begin recursion (if we've reached here, we're not outbox)
   # fetch links via nested variable print
   working_links=$(eval print $"$working")
+  # dead end check (if node has no definitions)
+  [ -z "$working_links" ] && {
+    return 0
+  }
   # continue recursion for every link
   IFS=$' '
   for i in $=working_links; do
@@ -89,7 +69,7 @@ create_worker() {
         zselect -t 5
       done
     }
-    create_worker "$i"
+    create_worker "$i" &
   done
   unset IFS
   return 0
@@ -98,55 +78,38 @@ create_worker() {
 ## parsing steps
 
 for line in $dayeleven_input; do
-  ## 1 - separate machine name and links,
+  ## 1 - separate machine name and links
   # can split by char count since machine names are always 3 chars long
   machine_name=${line: :3}
   # trim 5 instead of 3 to remove ': ' from beginning of line remainder
   line=${line:5}
   # add machine name to machines arr
   machines+=("$machine_name")
-  ## 2 - determine out point names
-  # if line = out, we add to outboxes array
-  [ "$line" = "out" ] && {
-    outboxes+=("$machine_name")
-  }
-  ## 3 - create machine links
+  ## 2 - create machine links
   IFS=$' '
   for link in $=line; do
-    eval "$machine_name"+=" $link"
+    eval "$machine_name+=' $link'"
   done
   unset IFS
 done
-# after above, we can now query the links of any machine via referencing its name
 
 ## main
 
 # start create_worker recursion
-touch /tmp/dayeleven_working/firstloop
-create_worker you
+create_worker you &
 
 # until all workers complete, do nothing
-z_jobs=$(query_jobs)
-until ((z_jobs == 0)); do
+until [ -z "$(query_jobs)" ]; do
   zselect -t 5
-  z_jobs=$(query_jobs)
 done
 
 # tally outboxes
-for i in /tmp/dayeleven_working/*.outbox; do
-  ((outbox_res++))
+for i in /tmp/dayeleven_working/*.outbox(N); do
+  ((result++))
 done
-
-# tally you repetitions
-for i in /tmp/dayeleven_working/*.you; do
-  ((you_res++))
-done
-
-# multiply you by outbox to get final result
-((result=(outbox_res*you_res)))
 
 # print results
-print $result
+print "$result"
 
 # cleanup
 rm -rf /tmp/dayeleven_working
