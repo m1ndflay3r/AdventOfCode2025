@@ -7,16 +7,33 @@
   print "Error: \'input\' not found"
 }
 
+# alias integer to int for brevity
+alias int="integer"
+
 # array declarations
-declare -a dayeleven_input outboxes
+declare -a dayeleven_input outboxes machines worker_ids
+
+# variable declarations
+int worker_id result
 
 # read input into linear array
 dayeleven_input=("${(@f)$(<input)}")
 
+# initialize jobs count if unset
+[ -z "$j" ] && {
+  j=$(($(nproc)+1))
+}
+
+# clear working dir if exist, and remake
+[ -d /tmp/dayeleven_working ] && {
+  rm -rf /tmp/dayeleven_working
+}
+mkdir /tmp/dayeleven_working
+
 ## helper functions
 
 # query whether machine is outbox
-query_out() {
+is_outbox() {
   box="$1"
   for outbox in $outboxes; do
     [ "$box" = "$outbox" ] && {
@@ -26,27 +43,33 @@ query_out() {
   return 1
 }
 
-# link machines together into chains
-create_links() {
-  for line in $dayeleven_input; do
-    # can split by char count since machine names are always 3 chars long
-    machine_name=${line: :3}
-    # trim 5 instead of 3 to remove ': ' from beginning of line remainder
-    line=${line:5}
-    ## 1 - determine out point names
-    # if line = out, we add to outboxes array
-    [ "$line" = "out" ] && {
-      outboxes+=("$machine_name")
-    }
-    ## 2 - create machine links
-    IFS=$' '
-    for link in $=line; do
-      eval $machine_name+=" $link"
-    done
-    unset IFS
-  done
-  # after above, we can now query the links of any machine via referencing its name
+# recursive create_worker function
+create_worker() {
 }
+
+## parsing steps
+
+for line in $dayeleven_input; do
+  ## 1 - separate machine name and links,
+  # can split by char count since machine names are always 3 chars long
+  machine_name=${line: :3}
+  # trim 5 instead of 3 to remove ': ' from beginning of line remainder
+  line=${line:5}
+  # add machine name to machines arr
+  machines+=("$machine_name")
+  ## 2 - determine out point names
+  # if line = out, we add to outboxes array
+  [ "$line" = "out" ] && {
+    outboxes+=("$machine_name")
+  }
+  ## 3 - create machine links
+  IFS=$' '
+  for link in $=line; do
+    eval $machine_name+=" $link"
+  done
+  unset IFS
+done
+# after above, we can now query the links of any machine via referencing its name
 
 ## main
 
