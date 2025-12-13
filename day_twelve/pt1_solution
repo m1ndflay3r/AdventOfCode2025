@@ -22,26 +22,26 @@ int sepflag floor_id
 
 # prints matrix
 check_fit() {
-  start_x="$1"
-  start_y="$2"
-  shape_coords="$3"
-  coord_x=''
-  coord_y=''
-  for coord in $shape_coords; do
-    IFS=$','; for i in $=coord; do
-      [ -z "$coord_x" ] && {
-        coord_x="$coord"
-        target_x=$((start_x+coord_x))
-      } || {
-        coord_y="$coord"
-        target_y=$((start_y+coord_y))
-      }
-      ! [ -z "$floor_spaces[$target_x,$target_y]" ] && {
-        return 1
-      }
-    done; unset IFS
-    return 0
+  fid="$1"
+  int start_x="$2"
+  int start_y="$3"
+  shape_coords="$4"
+  int target_x
+  int target_y
+  for coord in $=shape_coords; do
+    coord_x=${coord%,*}
+    coord_y=${coord#*,}
+    ((target_x=start_x+coord_x))
+    ((target_y=start_y+coord_y))
+    floor_space="$floor_spaces[$fid,$target_x,$target_y]"
+    [[ -z "$floor_space" ]] && {
+      return 1
+    }
+    [[ "$floor_space" != "." ]] && {
+      return 1
+    }
   done
+  return 0
 }
 
 process_shape_buffer() {
@@ -67,6 +67,10 @@ process_shape_buffer() {
     done
     ((y++))
   done
+  shapes[$psb_id]="${psb_coords[*]}"
+  areas[$psb_id]=$block_count
+
+  current_shape_lines=()
 }
 
 # prints grid corresponding to x and y val
@@ -104,31 +108,17 @@ while read -r -u0 line; do
     # else, is a box shape definition - store under "current_shape_lines"
     } || {
       ((sepflag==0)) && {
-        current_shape_lines+=("$lines")
+        current_shape_lines+=("$line")
       }
     }
   # else, these are floor lines, and we handle accordingly
   } || {
     ((floor_id++))
     floor_ids+=("$floor_id")
-    gridsize=''
-    presents=''
-    IFS=$':'; for splite in $=line; do
-      [ -z "$gridsize" ] && {
-        gridsize="$splite"
-      } || {
-        present="$splite"
-      }
-    done; unset IFS
-    x=''
-    y=''
-    IFS=$'x'; for x_y in $=gridsize; do
-      [ -z "$x" ] && {
-        x="$x_y"
-      } || {
-        y="$x_y"
-      }
-    done; unset IFS
+    gridsize=${line%:*}
+    present=${line#*:}
+    x=${gridsize%x*}
+    y=${gridsize#*x}
     grid=$(print_grid "$x" "$y")
     y_count=0
     IFS=$'\n'; for grid_y in $=grid; do
