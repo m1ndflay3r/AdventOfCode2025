@@ -12,7 +12,7 @@
 alias int="integer"
 
 # array declarations
-declare -A boxes floor_spaces shapes areas
+declare -A floor_spaces shapes areas
 declare -a floor_ids presents current_shape_lines
 
 # variable declarations
@@ -29,18 +29,23 @@ check_fit() {
   int target_x
   int target_y
   for coord in $=shape_coords; do
-    coord_x=${coord%,*}
-    coord_y=${coord#*,}
-    ((target_x=start_x+coord_x))
-    ((target_y=start_y+coord_y))
+    # split coord into idx and idy
+    idx=${coord%,*}
+    idy=${coord#*,}
+    ((target_x=start_x+idx))
+    ((target_y=start_y+idy))
+    # check floor at this spot
     floor_space="$floor_spaces[$fid,$target_x,$target_y]"
+    # fail if oob
     [[ -z "$floor_space" ]] && {
       return 1
     }
+    # fail if space is full
     [[ "$floor_space" != "." ]] && {
       return 1
     }
   done
+  # if loop didn't return 1, return 0 (space fits)
   return 0
 }
 
