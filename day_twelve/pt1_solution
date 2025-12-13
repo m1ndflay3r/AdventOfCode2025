@@ -12,8 +12,8 @@
 alias int="integer"
 
 # array declarations
-declare -A boxes floor_spaces
-declare -a floor_ids presents
+declare -A boxes floor_spaces shapes areas
+declare -a floor_ids presents current_shape_lines
 
 # variable declarations
 int sepflag floor_id
@@ -21,7 +21,52 @@ int sepflag floor_id
 ## helper functions
 
 # prints matrix
-print_matrix() {
+check_fit() {
+  start_x="$1"
+  start_y="$2"
+  shape_coords="$3"
+  coord_x=''
+  coord_y=''
+  for coord in $shape_coords; do
+    IFS=$','; for i in $=coord; do
+      [ -z "$coord_x" ] && {
+        coord_x="$coord"
+        target_x=$((start_x+coord_x))
+      } || {
+        coord_y="$coord"
+        target_y=$((start_y+coord_y))
+      }
+      ! [ -z "$floor_spaces[$target_x,$target_y]" ] && {
+        return 1
+      }
+    done; unset IFS
+    return 0
+  done
+}
+
+process_shape_buffer() {
+  psb_id="$1"
+  # if no lines, skip
+  ((${#current_shape_lines}==0)) && return 0
+  # arrays, vars
+  psb_coords=()
+  int y=0
+  int block_count=0
+  # iterate over current_shape_lines
+  for row in $current_shape_lines; do
+    # split string (row) into chars
+    psb_chars=(${(s::)row})
+    int x=0
+    for char in $psb_chars; do
+      [[ "$char" = '#' ]] && {
+        # store x,y coords
+        psb_coords+=("$x,$y")
+        ((block_count++))
+      }
+      ((x++))
+    done
+    ((y++))
+  done
 }
 
 # prints grid corresponding to x and y val
@@ -54,21 +99,13 @@ while read -r -u0 line; do
   ((sepflag=0)) && {
     # if line contains ":", then line is an index definition
     [[ "$line" = *":"* ]] && {
+      [ -n "$index" ] && process_shape_buffer "$index"
       index=${line: :1}
-      y_count=0
-    # else, is a box shape definition - store under most recent indice
+    # else, is a box shape definition - store under "current_shape_lines"
     } || {
-      ((y_count++))
-      x_count=0
-      while true; do
-        char=${line: :1}
-        line=${line:1}
-        [ -z "$char" ] && {
-          break
-        }
-        ((x_count++))
-        boxes[$index,$x_count,$y_count]="$char"
-      done
+      ((sepflag==0)) && {
+        current_shape_lines+=("$lines")
+      }
     }
   # else, these are floor lines, and we handle accordingly
   } || {
