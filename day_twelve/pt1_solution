@@ -109,4 +109,5 @@ while read -r -u0 line; do
   }
 done < <(<input)
 
-# we now have several logical structures made from input
+# we now have several logical structures made from input with which to query.
+# this executes very, very quickly
