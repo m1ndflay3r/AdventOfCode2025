@@ -1,0 +1,112 @@
+#!/usr/bin/env zsh
+
+## env setup
+
+# check for presence of puzzle input, error out if not found
+[ -f input ] || {
+  print "Error: could not find \'input\'"
+  return 1
+}
+
+# alias integer to int for brevity
+alias int="integer"
+
+# array declarations
+declare -A boxes floor_spaces
+declare -a floor_ids presents
+
+# variable declarations
+int sepflag floor_id
+
+## helper functions
+
+# prints matrix
+print_matrix() {
+}
+
+# prints grid corresponding to x and y val
+print_grid() {
+  x_val="$1"
+  y_val="$2"
+  y_count=0
+  while true; do
+    ((y_count++))
+    ((y_count>y_val)) && break
+    x_count=0
+    while true; do
+      ((x_count++))
+      ((x_count>x_val)) && break
+      print -n '.'
+    done
+    print
+  done
+}
+
+## parsing steps
+
+# 1 - read + separate puzzle sections
+while read -r -u0 line; do
+  # if line contains x, we've entered floor space
+  [[ "$line" = *"x"* ]] && {
+    ((sepflag=1))
+  }
+  # if sepflag is 0, we haven't encountered a floor line yet
+  ((sepflag=0)) && {
+    # if line contains ":", then line is an index definition
+    [[ "$line" = *":"* ]] && {
+      index=${line: :1}
+      y_count=0
+    # else, is a box shape definition - store under most recent indice
+    } || {
+      ((y_count++))
+      x_count=0
+      while true; do
+        char=${line: :1}
+        line=${line:1}
+        [ -z "$char" ] && {
+          break
+        }
+        ((x_count++))
+        boxes[$index,$x_count,$y_count]="$char"
+      done
+    }
+  # else, these are floor lines, and we handle accordingly
+  } || {
+    ((floor_id++))
+    floor_ids+=("$floor_id")
+    gridsize=''
+    presents=''
+    IFS=$':'; for splite in $=line; do
+      [ -z "$gridsize" ] && {
+        gridsize="$splite"
+      } || {
+        present="$splite"
+      }
+    done; unset IFS
+    x=''
+    y=''
+    IFS=$'x'; for x_y in $=gridsize; do
+      [ -z "$x" ] && {
+        x="$x_y"
+      } || {
+        y="$x_y"
+      }
+    done; unset IFS
+    grid=$(print_grid "$x" "$y")
+    y_count=0
+    IFS=$'\n'; for grid_y in $=grid; do
+      ((y_count++))
+      x_count=0
+      while true; do
+        working_indice=${grid_y: :1}
+        grid_y=${grid_y:1}
+        [ -z "$working_indice" ] && break
+        ((x_count++))
+        floor_spaces[$floor_id,$x_count,$y_count]=$working_indice
+      done
+    done; unset IFS
+    presents[$floor_id]="$present"
+  }
+done < <(<input)
+
+# we now have several logical structures made from input
