@@ -69,7 +69,7 @@ check_fit() {
     ((target_x=start_x+idx))
     ((target_y=start_y+idy))
     # check floor at this spot
-    floor_space="$floor_spaces[$fid,$target_x,$target_y]"
+    floor_space="${floor_spaces[$fid,$target_x,$target_y]}"
     # fail if oob
     [[ -z "$floor_space" ]] && {
       return 1
