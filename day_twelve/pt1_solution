@@ -20,8 +20,42 @@ int sepflag floor_id
 
 ## helper functions
 
-# prints matrix
+# rotates coord string 90deg (clockwise)
+rotate_coords() {
+  rc_input_coords="$1"
+  rc_new_coords=()
+  for coord in $=rc_input_coords; do
+    rc_x=${coord%,*}
+    rc_y=${coord#+,}
+    rc_new_coords+=("$((-rc_y)),$rc_x")
+  done
+  print "${rc_new_coords[*]}"
+}
+
+# normalize negative coords (generated from rotation) to 0,0
+normalize_coords() {
+  nc_input_coords="$1"
+  int nc_min_x=999 nc_min_y=999
+  # find minimum
+  for coord in $=nc_input_coords; do
+    nc_x=${coord%,*}
+    nc_y=${coord#*,}
+    ((nc_x<nc_min_x)) && nc_min_x=$nc_x
+    ((nc_y<nc_min_y)) && nc_min_y=$nc_y
+  done
+  # shift remaining
+  nc_out=()
+  for coord in $=nc_input_coords; do
+    nc_x=${coord%,*}
+    nc_y=${coord#*,}
+    nc_out+=("$((nc_x-nc_min_x)),$((nc_y-nc_min_y))")
+  done
+  print "${nc_out[*]}"
+}
+
+# checks if shape fits in a given floor space
 check_fit() {
+  # fetch input
   fid="$1"
   int start_x="$2"
   int start_y="$3"
@@ -49,6 +83,7 @@ check_fit() {
   return 0
 }
 
+# convert buffered lines into coords
 process_shape_buffer() {
   psb_id="$1"
   # if no lines, skip
@@ -72,9 +107,12 @@ process_shape_buffer() {
     done
     ((y++))
   done
+
+  # store results
   shapes[$psb_id]="${psb_coords[*]}"
   areas[$psb_id]=$block_count
 
+  # clear buffer
   current_shape_lines=()
 }
 
@@ -95,6 +133,8 @@ print_grid() {
     print
   done
 }
+
+
 
 ## parsing steps
 
