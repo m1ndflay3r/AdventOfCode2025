@@ -183,3 +183,6 @@ done < <(<input)
 
 # we now have several logical structures made from input with which to query.
 # this executes very, very quickly
+
+# uncomment below for verification of above functionality
+#print $shapes[0]
