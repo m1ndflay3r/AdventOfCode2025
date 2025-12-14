@@ -57,7 +57,7 @@ precompute_variations() {
   for d in $=prv_current_coords; do
     prv_fx=${d%,*}
     prv_fy=${d#*,}
-    prv_flipped+="$((-prv_fx)),$prv_fy"
+    prv_flipped+="$((-prv_fx)),$prv_fy "
   done
   prv_current_coords="$prv_flipped"
 
