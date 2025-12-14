@@ -42,8 +42,8 @@ sort_presents() {
 # pre-computation for rotation/flips
 precompute_variations() {
   prv_shape_id="$1"
-  [[ -n "${variation_cache[$shape_id,0]}" ]] && return 0
-  prv_current_coords="${shapes[$shape_id]}"
+  [[ -n "${variation_cache[$prv_shape_id,0]}" ]] && return 0
+  prv_current_coords="${shapes[$prv_shape_id]}"
 
   # first 4 rotations
   for c in {0..3}; do
@@ -202,10 +202,13 @@ modify_grid() {
 
 # recursive solver function
 solve_floor() {
-  sf_fid="$1"
-  sf_max_x="$2"
-  sf_max_y="$3"
-  sf_p_list=($=4)
+  local sf_fid="$1"
+  local sf_max_x="$2"
+  local sf_max_y="$3"
+  local sf_p_list=($=4)
+  local sf_current_shape
+  local remaining_presents
+  local sf_var_coords
 
   # success
   ((${#sf_p_list}==0)) && return 0
