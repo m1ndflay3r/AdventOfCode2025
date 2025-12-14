@@ -310,7 +310,7 @@ for fid in $floor_ids; do
   w=${raw_dims% *}
   h=${raw_dims#* }
 
-  # 3 - sort (massive speed increase)
+  # 3 - sort (massive speed-up)
   sorted_list=$(sort_presents "${real_present_list[*]}")
 
   print "Checking floor no. $fid (width x height)..."
