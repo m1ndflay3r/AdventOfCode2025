@@ -200,7 +200,47 @@ modify_grid() {
   done
 }
 
+# recursive solver function
 solve_floor() {
+  sf_fid="$1"
+  sf_max_x="$2"
+  sf_max_y="$3"
+  sf_p_list=($=4)
+
+  # success
+  ((${#sf_p_list}==0)) && return 0
+
+  sf_current_shape="${sf_p_list[1]}"
+  shift sf_p_list
+  remaining_presents="${sf_p_list[*]}"
+
+  precompute_variations "$sf_current_shape"
+
+  int x y v
+  for ((y=1; y<=sf_max_y; y++)); do
+    for ((x=1; x<=sf_max_x; x++)); do
+      # skip occupied slots
+      [[ "${floor_spaces[$sf_fid,$x,$y]}" != "." ]] && continue
+
+      # try variations
+      for ((v=0; v<=7; v++)); do
+        sf_var_coords="${variation_cache[$sf_current_shape,$v]}"
+
+        check_fit "$sf_fid" "$x" "$y" "$sf_var_coords" && {
+          modify_grid "$sf_fid" "$x" "$y" "$sf_var_coords" '#'
+
+          # recurse
+          solve_floor "$sf_fid" "$sf_max_x" "$sf_max_y" "$remaining_presents" && {
+            return 0
+          }
+
+          # undo grid modification from above
+          modify_grid "$sf_fid" "$x" "$y" "$sf_var_coords" "."
+        }
+      done
+    done
+  done
+  return 1
 }
 
 ## parsing steps
