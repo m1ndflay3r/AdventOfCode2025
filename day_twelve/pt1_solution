@@ -26,7 +26,7 @@ rotate_coords() {
   rc_new_coords=()
   for coord in $=rc_input_coords; do
     rc_x=${coord%,*}
-    rc_y=${coord#+,}
+    rc_y=${coord#*,}
     rc_new_coords+=("$((-rc_y)),$rc_x")
   done
   print "${rc_new_coords[*]}"
@@ -134,8 +134,6 @@ print_grid() {
   done
 }
 
-
-
 ## parsing steps
 
 # 1 - read + separate puzzle sections
@@ -145,11 +143,11 @@ while read -r -u0 line; do
     ((sepflag=1))
   }
   # if sepflag is 0, we haven't encountered a floor line yet
-  ((sepflag=0)) && {
+  ((sepflag==0)) && {
     # if line contains ":", then line is an index definition
     [[ "$line" = *":"* ]] && {
       [ -n "$index" ] && process_shape_buffer "$index"
-      index=${line: :1}
+      index=${line%:}
     # else, is a box shape definition - store under "current_shape_lines"
     } || {
       ((sepflag==0)) && {
@@ -180,6 +178,8 @@ while read -r -u0 line; do
     presents[$floor_id]="$present"
   }
 done < <(<input)
+
+[ -n "$index" ] && process_shape_buffer "$index"
 
 # we now have several logical structures made from input with which to query.
 # this executes very, very quickly
