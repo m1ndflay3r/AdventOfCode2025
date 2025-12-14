@@ -24,19 +24,19 @@ int sepflag floor_id result
 sort_presents() {
   sp_list=($=1)
   # bubble sort (more than fast enough for the data size)
-  int sp_working=${#list}
+  int sp_working=${#sp_list}
   for ((a=1; a<sp_working; a++)); do
     for ((b=1; b<=sp_working-a; b++)); do
-      sp_id1=${list[$b]}
-      sp_id2=${list[$b+1]}
+      sp_id1=${sp_list[$b]}
+      sp_id2=${sp_list[$b+1]}
       ((areas[$sp_id1] < areas[$sp_id2])) && {
         # swap
-        list[$b]=$sp_id2
-        list[$b+1]=$sp_id1
+        sp_list[$b]=$sp_id2
+        sp_list[$b+1]=$sp_id1
       }
     done
   done
-  print "${list[*]}"
+  print "${sp_list[*]}"
 }
 
 # pre-computation for rotation/flips
@@ -298,7 +298,7 @@ for fid in $floor_ids; do
   presents_raw="${presents[$fid]}"
   real_present_list=()
   idx=0
-  for qty in $=raw_presents; do
+  for qty in $=presents_raw; do
     for ((q=0; q<qty; q++)); do
       real_present_list+=("$idx")
     done
@@ -306,7 +306,7 @@ for fid in $floor_ids; do
   done
 
   # 2 - get dimensions
-  raw_dims="{floor_dims[$fid]}"
+  raw_dims="${floor_dims[$fid]}"
   w=${raw_dims% *}
   h=${raw_dims#* }
 
