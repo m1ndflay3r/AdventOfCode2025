@@ -16,7 +16,7 @@ declare -A floor_spaces shapes areas floor_dims variation_cache
 declare -a floor_ids presents current_shape_lines
 
 # variable declarations
-int sepflag floor_id
+int sepflag floor_id result
 
 ## helper functions
 
@@ -104,20 +104,20 @@ normalize_coords() {
 # checks if shape fits in a given floor space
 check_fit() {
   # fetch input
-  fid="$1"
-  int start_x="$2"
-  int start_y="$3"
-  shape_coords="$4"
-  int target_x
-  int target_y
-  for coord in $=shape_coords; do
-    # split coord into idx and idy
-    idx=${coord%,*}
-    idy=${coord#*,}
-    ((target_x=start_x+idx))
-    ((target_y=start_y+idy))
+  chkf_fid="$1"
+  int chkf_start_x="$2"
+  int chkf_start_y="$3"
+  chkf_shape_coords="$4"
+  int chkf_target_x
+  int chkf_target_y
+  for coord in $=chkf_shape_coords; do
+    # split coord into chkf_idx and chkf_idy
+    chkf_idx=${coord%,*}
+    chkf_idy=${coord#*,}
+    ((chkf_target_x=chkf_start_x+chkf_idx))
+    ((chkf_target_y=chkf_start_y+chkf_idy))
     # check floor at this spot
-    floor_space="${floor_spaces[$fid,$target_x,$target_y]}"
+    floor_space="${floor_spaces[$chkf_fid,$chkf_target_x,$chkf_target_y]}"
     # fail if oob
     [[ -z "$floor_space" ]] && {
       return 1
@@ -290,3 +290,37 @@ while read -r -u0 line; do
 done < <(<input)
 # process last shape in buffer
 [ -n "$index" ] && process_shape_buffer "$index"
+
+## main
+
+for fid in $floor_ids; do
+  # expand present count into linear array
+  presents_raw="${presents[$fid]}"
+  real_present_list=()
+  idx=0
+  for qty in $=raw_presents; do
+    for ((q=0; q<qty; q++)); do
+      real_present_list+=("$idx")
+    done
+    ((idx++))
+  done
+
+  # 2 - get dimensions
+  raw_dims="{floor_dims[$fid]}"
+  w=${raw_dims% *}
+  h=${raw_dims#* }
+
+  # 3 - sort (massive speed increase)
+  sorted_list=$(sort_presents "${real_present_list[*]}")
+
+  print "Checking floor no. $fid (width x height)..."
+
+  solve_floor "$fid" "$w" "$h" "$sorted_list" && {
+    ((result++))
+    print "Fit!"
+  } || {
+    print "Shit"
+  }
+done
+
+print "Total fits: "$result""
