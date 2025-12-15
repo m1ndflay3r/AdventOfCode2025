@@ -308,7 +308,6 @@ solve_iterative() {
   return 1
 }
 
-
 ## parsing steps
 
 # read input line by line
