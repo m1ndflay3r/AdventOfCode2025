@@ -136,6 +136,7 @@ create_worker() {
 }
 
 ## main
+
 while true; do
   # increase x pointer
   ((ex_pointer+=1))

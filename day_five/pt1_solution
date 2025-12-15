@@ -1,6 +1,7 @@
 #!/usr/bin/env zsh
 
 ## env setup
+
 # read puzzle input into variable, error if not found
 dayfive_input=$(<input) || {
   print "Error: cannot find \'input\'"
@@ -54,6 +55,7 @@ result=0
 }
 
 ## helper functions
+
 create_worker() {
   fresh_flag=0
   # begin iterating over every range in ingredient_range array
@@ -84,6 +86,7 @@ create_worker() {
 }
 
 ## main
+
 # start worker for each ingredient
 for ingredient in $ingredients[@]; do
   [ "$(query_jobs)" -ge "$j" ] && {

@@ -1,6 +1,7 @@
 #!/usr/bin/env zsh
 
 ## env setup
+
 # include zsh_libmisc, load needed library functions
 fpath=(/usr/lib/zsh_libmisc/libmisc.zwc $fpath)
 autoload query_jobs
@@ -33,6 +34,7 @@ declare -a worker_ids
 result='0'
 
 ## helper functions
+
 create_worker() {
   # initialize highest val. + workig num vars
   highest_jolt='0'
@@ -61,6 +63,7 @@ create_worker() {
 }
 
 ## main
+
 # start workers
 IFS=$'\n'
 for sort_me in $=daythree_input; do

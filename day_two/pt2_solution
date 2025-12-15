@@ -1,6 +1,7 @@
 #!/usr/bin/env zsh
 
 ## env setup
+
 # include zsh_libmisc, and load needed library functions
 fpath=(/usr/lib/zsh_libmisc/libmisc.zwc $fpath)
 autoload query_jobs
@@ -35,6 +36,7 @@ result=0
 }
 
 ## helper functions
+
 # create worker function - expects a number range to work on.
 # uses variable num_range for input
 create_worker() {
@@ -77,6 +79,7 @@ create_worker() {
 
 
 ## main
+
 #iterate over each number range, using comma for field separation
 IFS=$','
 for num_range in $=daytwo_input; do
