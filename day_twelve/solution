@@ -161,14 +161,14 @@ solve_iterative() {
     precompute_variations_1d "$sid" "$width"
   done
 
-  # 2. Setup Grid (1D array, 0-based)
+  # 2 - Setup Grid (1D array, 0-based)
   # using indices 1 through $grid_size for speed/consistency
   local -a grid
   for ((i=1; i<=grid_size; i++)); do
     grid[i]=0
   done
 
-  # 3. Setup Stack
+  # 3 - Setup Stack
   # track [current_variation] and [current_position] for each level
   local -a s_var s_pos
   # init stack for level 1
