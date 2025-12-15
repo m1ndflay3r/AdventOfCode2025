@@ -1,0 +1,372 @@
+#!/usr/bin/env zsh
+
+## env setup
+
+# check for input, error if not found
+[ -f input ] || {
+  print "Error: \'input\' not found"
+  return 1
+}
+
+# increase stack/memory limits just in case
+ulimit -s hard >/dev/null 2>&1 || ulimit -s 65532 >/dev/null 2>&1
+
+# alias integer to int for brevity
+alias int="integer"
+
+# array declarations
+declare -A shapes areas variation_counts variation_cache_1d
+declare -a floor_ids presents current_shape_lines
+
+# variable declarations
+int spinc floor_id result total_lines
+
+## helper functions
+
+# progress spinner, because I can
+spin() {
+  local -a chars=( '⌌' '⌍' '⌏' '⌎' )
+  print -n "\b${chars[((++spinc%4)+1)]}"
+}
+
+# 90 degree rotation
+rotate_coords() {
+  local input="$1" new=""
+  for c in $=input; do
+    local x=${c%,*} y=${c#*,}
+    new+="$((-y)),$x "
+  done
+  print "$new"
+}
+
+# coord sanitation
+normalize_coords() {
+  local input="$1"
+  int min_x=999 min_y=999
+  for c in $=input; do
+    local x=${c%,*} y=${c#*,}
+    ((x < min_x)) && min_x=$x
+    ((y < min_y)) && min_y=$y
+  done
+  local out=""
+  for c in $=input; do
+    local x=${c%,*} y=${c#*,}
+    out+="$((x-min_x)),$((y-min_y)) "
+  done
+  print "$out"
+}
+
+# shape buffer processor (linearized)
+process_shape_buffer() {
+  local id="$1"
+  ((${#current_shape_lines}==0)) && return 0
+  local coords=""
+  int y=0 count=0
+  for row in $current_shape_lines; do
+    local chars=(${(s::)row})
+    int x=0
+    for char in $chars; do
+      [[ "$char" == '#' ]] && {
+        coords+="$x,$y "
+        ((count++))
+      }
+      ((x++))
+    done
+    ((y++))
+  done
+  shapes[$id]="$coords"
+  areas[$id]=$count
+  current_shape_lines=()
+}
+
+# calculate 1d offsets for width of given floor
+# (removes all geometry math, which was far too slow)
+precompute_variations_1d() {
+  local pid="$1" width="$2"
+  local key="${pid}_${width}"
+  [[ -n "${variation_counts[$key]}" ]] && return 0
+
+  local raw="${shapes[$pid]}"
+  local -A seen
+  local vars=()
+  int count=0
+
+  # generate 8 geometric variations
+  local temp="$raw"
+  for ((i=0; i<4; i++)); do
+    vars+=("$temp")
+    temp=$(rotate_coords "$temp")
+  done
+
+  local flipped=""
+  for c in $=raw; do
+    local x=${c%,*} y=${c#*,}
+    flipped+="$((-x)),$y "
+  done
+
+  temp="$flipped"
+  for ((i=0; i<4; i++)); do
+    vars+=("$temp")
+    temp=$(rotate_coords "$temp")
+  done
+
+  for v in $vars; do
+    local norm=$(normalize_coords "$v")
+    local sorted=$(print "$norm" | tr ' ' '\n' | sort | tr '\n' ' ')
+    [[ -z "${seen[$sorted]}" ]] && {
+      seen[$sorted]=1
+      # convert to 1d offsets: index = y * width + x
+      local offsets_1d=""
+      for c in $=norm; do
+        local cx=${c%,*} cy=${c#*,}
+        # we verify width bounds here (store linear offset).
+        int off=$((cy * width + cx))
+        offsets_1d+="$off "
+      done
+      variation_cache_1d[$key,$count]="$offsets_1d"
+      ((count++))
+    }
+  done
+  variation_counts[$key]=$count
+}
+
+# sorts presents to group identical ones (crucial for pruning)
+sort_presents() {
+  local list=($=1)
+  int n=${#list}
+  for ((i=1; i<n; i++)); do
+    for ((j=1; j<=n-i; j++)); do
+      local id1=${list[$j]} id2=${list[$j+1]}
+      ((areas[$id1] < areas[$id2])) && {
+        list[$j]=$id2; list[$j+1]=$id1
+      } || {
+        ((areas[$id1] == areas[$id2] && id1 > id2)) && {
+          list[$j]=$id2; list[$j+1]=$id1
+        }
+      }
+    done
+  done
+  print "${list[*]}"
+}
+
+# iterative solver function
+solve_iterative() {
+  local width="$1" height="$2" p_list_str="$3"
+  local p_list=($=p_list_str) # array of shape IDs (0-based indices)
+  int num_presents=${#p_list}
+  int grid_size=$((width * height))
+
+  # 1 - Recompute Variations for Current Width
+  for sid in "${(@u)p_list}"; do
+    precompute_variations_1d "$sid" "$width"
+  done
+
+  # 2. Setup Grid (1D array, 0-based)
+  # using indices 1 through $grid_size for speed/consistency
+  local -a grid
+  for ((i=1; i<=grid_size; i++)); do
+    grid[i]=0
+  done
+
+  # 3. Setup Stack
+  # track [current_variation] and [current_position] for each level
+  local -a s_var s_pos
+  # init stack for level 1
+  s_var[1]=0
+  s_pos[1]=0 # 0 means "start at beginning"
+  int level=1
+
+  while ((level > 0)); do
+    # check success
+    ((level > num_presents)) && {
+      return 0 # true
+    }
+
+    local sid="${p_list[level]}"
+    local key="${sid}_${width}"
+    int v_limit=${variation_counts[$key]}
+
+    # symmetry pruning - if piece is identical to previous, start scanning after previous
+    int start_p=1
+    ((level > 1)) && {
+      local prev_sid="${p_list[level-1]}"
+      [[ "$sid" = "$prev_sid" ]] && {
+        start_p=${s_pos[level-1]} # start at previous pos
+      }
+    }
+
+    # resume state
+    int curr_v=${s_var[level]}
+    int curr_p=${s_pos[level]}
+
+    # if just entered level, snap to start
+    ((curr_p < start_p)) && {
+      curr_p=$start_p
+      curr_v=0
+    }
+
+    int placed=0
+
+    # --- Scanning Loop ---
+    # loop positions
+    while ((curr_p <= grid_size)); do
+      # anchor check optimization (is grid empty here?)
+      ((grid[curr_p] != 0)) && {
+        curr_v=0
+        ((curr_p++))
+        continue
+      }
+
+      # calculate x coord of anchor (1-based) for wrap check
+      int anchor_x=$(((curr_p - 1) % width))
+
+      # loop variations
+      while ((curr_v < v_limit)); do
+        local offsets="${variation_cache_1d[$key,$curr_v]}"
+        int fits=1
+
+        # check offsets
+        for off in $=offsets; do
+          int target=$((curr_p + off))
+
+          # 1 - Array Bounds
+          ((target > grid_size)) && {
+            fits=0
+            break
+          }
+
+          # 2 - Occupancy
+          ((grid[target] != 0)) && {
+            fits=0
+            break
+          }
+
+          # 3 - Wrapping Check
+          # calculate relative X of offset block
+          # the 'off' value is (dy * width + dx)
+          # we need to ensure (anchor_x + dx) didn't wrap to next line
+          # since dx is always positive (normalized), we check:
+          int dx=$((off % width))
+          ((anchor_x + dx >= width)) && {
+            fits=0
+            break
+          }
+        done
+
+        ((fits == 1)) && {
+          # place pieces
+          for off in $=offsets; do
+            int target=$((curr_p + off))
+            grid[target]=1
+          done
+
+          # save state, push
+          s_pos[level]=$curr_p
+          s_var[level]=$((curr_v + 1)) # resume at next variation on backtrack
+
+          ((level++))
+          s_pos[level]=0 # init next level
+          s_var[level]=0
+
+          placed=1
+          break 2 # break out of scan loops
+        }
+
+        ((curr_v++))
+      done
+
+      # reset variations for next position
+      curr_v=0
+      ((curr_p++))
+    done
+
+    # --- Backtracking ---
+    ((placed == 0)) && {
+      ((level--))
+      ((level > 0)) && {
+        # restore state of previous level
+        # stack stores state (prepared for next time)
+        # need to find what was actually placed we can remove it
+
+        # determine what was placed
+        # s_var[level] is (placed_var + 1)
+        int old_v=$((s_var[level] - 1))
+        int old_p=${s_pos[level]}
+        local old_sid="${p_list[level]}"
+        local old_key="${old_sid}_${width}"
+        local old_offsets="${variation_cache_1d[$old_key,$old_v]}"
+
+        # remove from grid
+        for off in $=old_offsets; do
+          int target=$((old_p + off))
+          grid[target]=0
+        done
+      }
+    }
+  done
+
+  return 1
+}
+
+
+## parsing steps
+
+# read input line by line
+while read -r -u0 line; do
+  ((total_lines++))
+  [[ "$line" = *"x"* ]] && ((sepflag=1))
+  ((sepflag==0)) && {
+    [[ "$line" = *":"* ]] && {
+      [ -n "$index" ] && process_shape_buffer "$index"
+      index=${line%:}
+    } || {
+      current_shape_lines+=("$line")
+    }
+  } || {
+    ((floor_id++))
+    floor_ids+=("$floor_id")
+    gridsize=${line%:*} present=${line#*:}
+    x=${gridsize%x*} y=${gridsize#*x}
+    floor_dims[$floor_id]="$x $y"
+    presents[$floor_id]="$present"
+  }
+done < <(tr -d '\r' < input)
+[ -n "$index" ] && process_shape_buffer "$index"
+
+## main
+
+print -n "\033[?25l"
+print -n "Solving for "$total_lines" floors...	"
+
+for fid in $floor_ids; do
+  # expand presents
+  raw_p="${presents[$fid]}"
+  real_list=()
+  int idx=0 total_area=0
+  for qty in $=raw_p; do
+    for ((q=0; q<qty; q++)); do
+      real_list+=("$idx")
+      ((total_area+=areas[$idx]))
+    done
+    ((idx++))
+  done
+  # dimensions
+  dims="${floor_dims[$fid]}"
+  w=${dims% *} h=${dims#* }
+  ((f_area=w*h))
+
+  # Heuristic 1: area check
+  ((total_area > f_area)) && {
+    spin
+    continue
+  }
+
+  # Heuristic 2: sorting (larger items first)
+  sorted_list=$(sort_presents "${real_list[*]}")
+  solve_iterative "$w" "$h" "$sorted_list" && {
+    ((result++))
+  }
+  spin
+done
+
+print "\nTotal fits: "$result"\033[?25h"
