@@ -286,7 +286,7 @@ solve_iterative() {
       ((level > 0)) && {
         # restore state of previous level
         # stack stores state (prepared for next time)
-        # need to find what was actually placed we can remove it
+        # need to find what was actually placed so we can remove it
 
         # determine what was placed
         # s_var[level] is (placed_var + 1)
