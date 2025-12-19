@@ -2,12 +2,6 @@
 
 ## env setup
 
-# include zsh_libmisc, and load needed library functions
-fpath=(/usr/lib/zsh_libmisc/libmisc.zwc $fpath)
-autoload query_jobs
-autoload getstrln
-autoload isevennum
-
 # delete tmpdir if exist, and create tmpdir
 [ -d /tmp/daytwo_working ] && {
   rm -rf /tmp/daytwo_working
@@ -36,6 +30,14 @@ result=0
 }
 
 ## helper functions
+
+# query current jobs count for parallel process management
+query_jobs() {
+  local job_counter=0
+  while IFS=$'\n' read -r -u0 active_jobs; do
+    job_counter=$((job_counter+1))
+  done < <(jobs)
+}
 
 # create worker function - expects a number range to work on.
 # uses variable num_range for input
